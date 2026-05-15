@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #a1c4fd 100%);
+  min-height: 100vh;
+  font-family: 'Comic Sans MS', 'Chalkboard SE', cursive;
+}
