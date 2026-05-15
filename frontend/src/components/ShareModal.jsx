@@ -10,29 +10,18 @@ export default function ShareModal({ shareData, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-3xl shadow-2xl p-8 w-80 flex flex-col gap-4 items-center">
-        <p className="text-3xl">🎉</p>
-        <p className="text-xl font-bold text-purple-700 text-center">
-          Your painting is ready to share!
-        </p>
-        <input
-          readOnly
-          value={shareData.share_url}
-          className="w-full border-2 border-purple-300 rounded-xl p-2 text-sm text-center"
-        />
-        <button
-          onClick={copy}
-          className="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-2xl py-3 transition-all"
-        >
-          {copied ? "✅ Copied!" : "📋 Copy link"}
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" dir="rtl">
+      <div className="card p-8 w-full max-w-sm flex flex-col gap-4 items-center animate-pop">
+        <div className="text-6xl animate-float">🎉</div>
+        <p className="text-2xl font-black text-purple-700 text-center">הציור מוכן לשיתוף!</p>
+        <input readOnly value={shareData.share_url}
+          className="w-full border-2 border-purple-200 rounded-xl p-3 text-sm text-center text-gray-500 bg-gray-50 font-mono" />
+        <button onClick={copy}
+          className="w-full shimmer-btn text-white font-black rounded-2xl py-3 text-lg transition-all">
+          {copied ? "✅ הועתק!" : "📋 העתיקי לינק"}
         </button>
-        <p className="text-gray-400 text-sm text-center">
-          Send this link to your parents or friends!
-        </p>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm">
-          Close
-        </button>
+        <p className="text-gray-400 text-sm text-center">שלחי למשפחה וחברים!</p>
+        <button onClick={onClose} className="text-gray-300 hover:text-gray-500 text-sm font-medium">סגרי</button>
       </div>
     </div>
   );

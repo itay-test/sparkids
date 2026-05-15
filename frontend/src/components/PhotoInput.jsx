@@ -8,47 +8,33 @@ export default function PhotoInput({ onPhoto }) {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setPreview(ev.target.result);
-      onPhoto(ev.target.result); // base64 data URL
-    };
+    reader.onload = (ev) => { setPreview(ev.target.result); onPhoto(ev.target.result); };
     reader.readAsDataURL(file);
   }
 
-  function clear() {
-    setPreview(null);
-    onPhoto(null);
-    inputRef.current.value = "";
-  }
+  function clear() { setPreview(null); onPhoto(null); inputRef.current.value = ""; }
 
   return (
-    <div className="flex flex-col items-center gap-3 w-full max-w-lg">
+    <div className="w-full">
       {!preview ? (
-        <label className="w-full cursor-pointer">
-          <div className="border-4 border-dashed border-purple-300 rounded-3xl p-8 text-center bg-white/60 hover:bg-white/80 transition-all">
-            <p className="text-5xl mb-2">📸</p>
-            <p className="text-purple-600 font-bold text-lg">צלמי תמונה או בחרי מהגלריה</p>
-            <p className="text-purple-400 text-sm">לחצי כאן</p>
+        <label className="cursor-pointer block">
+          <div className="card border-2 border-dashed border-purple-200 p-8 text-center hover:border-purple-400 transition-all">
+            <div className="text-5xl mb-3">📸</div>
+            <p className="font-black text-purple-700 text-lg">צלמי או בחרי תמונה</p>
+            <p className="text-gray-400 text-sm mt-1">לחצי כאן</p>
           </div>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFile}
-            className="hidden"
-          />
+          <input ref={inputRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden" />
         </label>
       ) : (
-        <div className="w-full relative">
-          <img src={preview} alt="uploaded" className="rounded-3xl w-full shadow-lg border-4 border-purple-300" />
-          <button
-            onClick={clear}
-            className="absolute top-3 left-3 bg-red-400 text-white rounded-full w-10 h-10 text-xl font-bold shadow-lg"
-          >
+        <div className="card overflow-hidden relative">
+          <img src={preview} alt="תמונה" className="w-full rounded-2xl" />
+          <button onClick={clear}
+            className="absolute top-3 left-3 bg-white shadow-md text-red-500 rounded-full w-9 h-9 font-bold text-lg flex items-center justify-center">
             ✕
           </button>
-          <p className="text-center text-purple-600 font-bold mt-2">תמונה נבחרה ✓ עכשיו תגידי מה להוסיף!</p>
+          <div className="p-3 text-center">
+            <p className="text-purple-600 font-bold">✓ תמונה נבחרה — עכשיו דברי!</p>
+          </div>
         </div>
       )}
     </div>
