@@ -1,12 +1,14 @@
 import os
+import base64
 import anthropic
-import httpx
+from google import genai
+from google.genai import types
 
 _claude = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+_gemini = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
 
 def make_kid_prompt(idea: str) -> str:
-    """Turn a kid's rough idea into a vivid painting prompt."""
     msg = _claude.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=200,
@@ -22,14 +24,18 @@ def make_kid_prompt(idea: str) -> str:
     return msg.content[0].text.strip()
 
 
-async def generate_image(prompt: str) -> str:
-    """Call OpenAI DALL-E 3 and return the image URL."""
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://api.openai.com/v1/images/generations",
-            headers={"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"},
-            json={"model": "dall-e-3", "prompt": prompt, "n": 1, "size": "1024x1024"},
-            timeout=60,
-        )
-        resp.raise_for_status()
-        return resp.json()["data"][0]["url"]
+def generate_image(prompt: str) -> str:
+    """Generate image with Gemini and return a base64 data URL."""
+    response = _gemini.models.generate_content(
+        model="gemini-2.0-flash-preview-image-generation",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=["TEXT", "IMAGE"]
+        ),
+    )
+    for part in response.candidates[0].content.parts:
+        if part.inline_data is not None:
+            mime = part.inline_data.mime_type
+            data = base64.b64encode(part.inline_data.data).decode("utf-8")
+            return f"data:{mime};base64,{data}"
+    raise RuntimeError("Gemini returned no image")

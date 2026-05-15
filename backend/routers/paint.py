@@ -20,5 +20,5 @@ async def paint(req: PaintRequest):
     if len(req.idea.strip()) < 3:
         raise HTTPException(400, "Tell me more about what you want to paint!")
     prompt = make_kid_prompt(req.idea)
-    image_url = await generate_image(prompt)
+    image_url = generate_image(prompt)
     return PaintResponse(image_url=image_url, prompt_used=prompt)
