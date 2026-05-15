@@ -13,9 +13,11 @@ def make_kid_prompt(idea: str) -> str:
     response = _gemini.models.generate_content(
         model=TEXT_MODEL,
         contents=(
-            f"A child wants to paint: '{idea}'. "
-            "Write a short, vivid, colorful image-generation prompt (max 50 words). "
-            "Keep it fun, bright, and appropriate for kids. Return only the prompt, nothing else."
+            f"A 5-year-old Israeli girl named Carmel said (possibly in Hebrew, baby talk, or broken words): '{idea}'. "
+            "Understand what she means even if the words are incomplete or childish. "
+            "Translate her idea to English and write a vivid, colorful, joyful image-generation prompt (max 50 words). "
+            "Keep it magical, cute, and appropriate for young children. "
+            "Return only the image prompt in English, nothing else."
         ),
     )
     return response.text.strip()
