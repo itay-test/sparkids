@@ -24,12 +24,12 @@ const BG_DECO = [
 ];
 
 export default function App() {
-  const [status, setStatus] = useState("idle");
+  const [status, setStatus]       = useState("idle");
   const [transcript, setTranscript] = useState("");
-  const [result, setResult] = useState(null);
+  const [result, setResult]       = useState(null);
   const [shareData, setShareData] = useState(null);
-  const [mode, setMode] = useState("voice");
-  const [photo, setPhoto] = useState(null);
+  const [mode, setMode]           = useState(null);   // null = not chosen yet
+  const [photo, setPhoto]         = useState(null);
 
   async function handleTranscript(text) {
     if (!text) { setStatus("idle"); return; }
@@ -46,33 +46,34 @@ export default function App() {
     }
   }
 
-  function cancel() {
-    setStatus("idle");
-    setTranscript("");
+  // go back one level
+  function goBack() {
+    if (status === "done")      { setResult(null); setTranscript(""); setStatus("idle"); return; }
+    if (status === "listening") { setStatus("idle"); return; }
+    if (photo)                  { setPhoto(null); return; }
+    if (mode)                   { setMode(null);  return; }
   }
 
   function reset() {
-    setStatus("idle");
-    setTranscript("");
-    setResult(null);
-    setShareData(null);
-    setPhoto(null);
+    setStatus("idle"); setTranscript(""); setResult(null);
+    setShareData(null); setPhoto(null); setMode(null);
   }
 
   async function handleShare() {
     if (!result) return;
     const { data } = await axios.post(`${API}/share/`, {
-      kid_name: "Carmel",
-      image_url: result.image_url,
-      prompt_used: result.prompt_used,
+      kid_name: "Carmel", image_url: result.image_url, prompt_used: result.prompt_used,
     });
     setShareData(data);
   }
 
-  const isIdle = status === "idle";
-  const isLoading = status === "loading";
+  const isIdle      = status === "idle";
+  const isLoading   = status === "loading";
   const isListening = status === "listening";
-  const isDone = status === "done";
+  const isDone      = status === "done";
+
+  // show back arrow whenever there's something to go back to
+  const canGoBack = mode !== null || photo || status !== "idle" || result;
 
   return (
     <div className="min-h-screen flex flex-col items-center pb-16 relative overflow-hidden" dir="rtl">
@@ -92,11 +93,18 @@ export default function App() {
           <div className="w-9 h-9 shimmer-btn rounded-xl flex items-center justify-center text-lg">🎨</div>
           <span className="text-xl font-black text-purple-700">Sparkids</span>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Global back/cancel — always visible unless idle with no photo */}
-          {(!isIdle || photo) && (
+        <div className="flex items-center gap-3">
+          {/* Back — one level */}
+          {canGoBack && !isLoading && (
+            <button onClick={goBack}
+              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-purple-400 hover:text-purple-700 transition-all text-lg font-bold">
+              ←
+            </button>
+          )}
+          {/* Full reset */}
+          {canGoBack && (
             <button onClick={reset}
-              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-400 hover:text-red-400 transition-all text-base">
+              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-300 hover:text-red-400 transition-all text-base">
               ✕
             </button>
           )}
@@ -106,42 +114,43 @@ export default function App() {
 
       <div className="w-full max-w-md px-4 flex flex-col gap-5 relative z-10">
 
-        {/* Mode toggle — idle only */}
-        {isIdle && (
-          <div className="card p-1.5 flex gap-1">
-            {[["voice","🎤"],["photo","📸"]].map(([m, icon]) => (
-              <button key={m} onClick={() => { setMode(m); setPhoto(null); }}
-                className={`flex-1 py-3 rounded-xl font-black text-2xl transition-all duration-200 ${
-                  mode === m ? "bg-purple-600 text-white shadow-md scale-[1.03]" : "text-gray-300 hover:text-purple-400"
-                }`}>
-                {icon}
+        {/* Step 1 — choose mode */}
+        {!mode && (
+          <div className="flex flex-col items-center gap-5 animate-pop">
+            <p className="text-4xl font-black text-purple-800 text-center leading-tight">מה תרצי<br/>לצייר היום?</p>
+            <div className="grid grid-cols-2 gap-4 w-full">
+              <button onClick={() => setMode("voice")}
+                className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95">
+                <span className="text-6xl">🎤</span>
+                <span className="text-purple-700 font-black text-lg">קול</span>
               </button>
-            ))}
+              <button onClick={() => setMode("photo")}
+                className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95">
+                <span className="text-6xl">📸</span>
+                <span className="text-purple-700 font-black text-lg">תמונה</span>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Photo upload */}
+        {/* Step 2 — photo upload (photo mode) */}
         {mode === "photo" && isIdle && <PhotoInput onPhoto={setPhoto} />}
 
-        {/* Voice button */}
-        {!isDone && (
+        {/* Step 2/3 — mic */}
+        {mode && !isDone && !isLoading && (
           <VoiceInput
             status={status}
             onTranscript={handleTranscript}
             onListening={() => setStatus("listening")}
-            onCancel={cancel}
+            onCancel={() => setStatus("idle")}
             disabled={mode === "photo" && !photo}
           />
         )}
 
-        {/* Transcript — only text, no label */}
-        {transcript && (isIdle || isListening) && (
-          <div className="card px-6 py-4 text-center animate-pop flex items-center justify-between gap-3">
-            <p className="text-2xl font-black text-purple-700 flex-1">"{transcript}"</p>
-            <button onClick={cancel}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:text-red-400 transition-all shrink-0">
-              ✕
-            </button>
+        {/* Transcript */}
+        {transcript && isIdle && (
+          <div className="card px-6 py-4 text-center animate-pop">
+            <p className="text-2xl font-black text-purple-700">"{transcript}"</p>
           </div>
         )}
 
