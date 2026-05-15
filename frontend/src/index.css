@@ -59,6 +59,18 @@ body {
   100% { background-position:  200% center; }
 }
 
+@keyframes shimmer-sweep {
+  0%   { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float-up {
+  0%   { transform: translateY(0)   scale(0.8); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 0.8; }
+  100% { transform: translateY(-180px) scale(1.2); opacity: 0; }
+}
+
 @keyframes pop {
   0%   { transform: scale(0.8); opacity: 0; }
   70%  { transform: scale(1.05); }

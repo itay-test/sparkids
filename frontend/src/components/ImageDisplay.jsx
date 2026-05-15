@@ -80,40 +80,40 @@ export default function ImageDisplay({ imageUrl, promptUsed, onShare, onReset, o
 
         {/* Magic overlay while improving */}
         {improving && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            {/* Spinning wand */}
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center animate-spin" style={{animationDuration:"3s"}}>
-                <Wand2 size={36} color="white" strokeWidth={1.5}/>
+          <div className="absolute inset-0 rounded-3xl overflow-hidden">
+            {/* Dimming layer */}
+            <div className="absolute inset-0 bg-black/40"/>
+
+            {/* Shimmer sweep */}
+            <div className="absolute inset-0 opacity-30"
+              style={{
+                background:"linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.7) 50%, transparent 60%)",
+                backgroundSize:"200% 100%",
+                animation:"shimmer-sweep 1.8s ease-in-out infinite",
+              }}/>
+
+            {/* Floating sparkle particles */}
+            {["✨","⭐","💫","🌟","✨","⭐"].map((e, i) => (
+              <span key={i} className="absolute text-2xl select-none pointer-events-none"
+                style={{
+                  left:`${12 + i * 16}%`,
+                  bottom:"10%",
+                  animation:`float-up ${2 + i * 0.4}s ease-in infinite`,
+                  animationDelay:`${i * 0.35}s`,
+                  opacity:0,
+                }}>
+                {e}
+              </span>
+            ))}
+
+            {/* Bottom message pill */}
+            <div className="absolute bottom-5 left-0 right-0 flex justify-center">
+              <div className="bg-white/95 backdrop-blur-sm rounded-full px-6 py-3 shadow-xl flex items-center gap-2">
+                <Wand2 size={18} className="text-purple-500 shrink-0" strokeWidth={2}/>
+                <p className="text-purple-700 font-black text-lg" key={msgIdx}>
+                  {IMPROVE_MSGS[msgIdx]}
+                </p>
               </div>
-              {/* Orbiting sparkles */}
-              {["✨","⭐","💫","🌟"].map((e, i) => (
-                <span key={i} className="absolute text-lg animate-spin"
-                  style={{
-                    animationDuration:"2s",
-                    animationDelay:`${i*0.5}s`,
-                    top:"50%", left:"50%",
-                    transformOrigin:`${28 + i*6}px 0`,
-                    marginTop:"-10px", marginLeft:"-10px",
-                  }}>
-                  {e}
-                </span>
-              ))}
-            </div>
-
-            {/* Rotating message */}
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-5 py-2 shadow-lg">
-              <p className="text-purple-700 font-black text-xl text-center animate-pop" key={msgIdx}>
-                {IMPROVE_MSGS[msgIdx]}
-              </p>
-            </div>
-
-            {/* Dots */}
-            <div className="flex gap-2">
-              {[0,1,2].map(i => (
-                <div key={i} className="w-2.5 h-2.5 rounded-full bg-white animate-bounce"
-                  style={{animationDelay:`${i*0.2}s`}}/>
-              ))}
             </div>
           </div>
         )}
