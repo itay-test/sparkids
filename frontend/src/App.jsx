@@ -120,45 +120,80 @@ export default function App() {
 
         {/* Step 1 — choose mode */}
         {!mode && (
-          <div className="flex flex-col items-center gap-5 animate-pop">
-            <p className="text-4xl font-black text-purple-800 text-center leading-tight">מה תרצי<br/>לצייר היום?</p>
+          <div className="flex flex-col items-center gap-6 animate-pop">
+            <div className="text-center">
+              <p className="text-5xl mb-2">🌟</p>
+              <p className="text-3xl font-black text-purple-800 leading-tight">היי כרמל!<br/>מה נצייר היום?</p>
+            </div>
             <div className="grid grid-cols-2 gap-4 w-full">
               <button onClick={() => setMode("voice")}
-                className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95">
-                <div className="w-16 h-16 shimmer-btn rounded-full flex items-center justify-center">
-                  <Mic size={34} color="white" strokeWidth={1.5}/>
+                className="card py-8 px-4 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-purple-200">
+                <div className="w-20 h-20 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
+                  <Mic size={40} color="white" strokeWidth={1.5}/>
                 </div>
-                <span className="text-purple-700 font-black text-lg">קול</span>
+                <span className="text-purple-700 font-black text-xl">דברי! 🎤</span>
+                <span className="text-purple-300 font-bold text-xs text-center">תגידי מה תרצי<br/>ואני אצייר</span>
               </button>
               <button onClick={() => setMode("photo")}
-                className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95">
-                <div className="w-16 h-16 shimmer-btn rounded-full flex items-center justify-center">
-                  <Camera size={34} color="white" strokeWidth={1.5}/>
+                className="card py-8 px-4 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
+                <div className="w-20 h-20 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
+                  <Camera size={40} color="white" strokeWidth={1.5}/>
                 </div>
-                <span className="text-purple-700 font-black text-lg">תמונה</span>
+                <span className="text-purple-700 font-black text-xl">תמונה! 📸</span>
+                <span className="text-purple-300 font-bold text-xs text-center">צלמי תמונה<br/>ואני אקשט אותה</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2 — photo upload (photo mode) */}
+        {/* Step 2 — photo upload */}
         {mode === "photo" && isIdle && <PhotoInput onPhoto={setPhoto} />}
 
-        {/* Step 2/3 — mic */}
+        {/* Step 2/3 — mic screen */}
         {mode && !isDone && !isLoading && (
-          <VoiceInput
-            status={status}
-            onTranscript={handleTranscript}
-            onListening={() => setStatus("listening")}
-            onCancel={() => setStatus("idle")}
-            disabled={mode === "photo" && !photo}
-          />
-        )}
+          <div className="flex flex-col items-center gap-6 animate-pop">
 
-        {/* Transcript */}
-        {transcript && isIdle && (
-          <div className="card px-6 py-4 text-center animate-pop">
-            <p className="text-2xl font-black text-purple-700">"{transcript}"</p>
+            {/* Big instruction card — only when idle */}
+            {isIdle && !transcript && (
+              <div className="card w-full px-6 py-5 text-center border-2 border-purple-100">
+                <p className="text-3xl font-black text-purple-800 leading-snug">
+                  {mode === "photo" && !photo
+                    ? "קודם בחרי תמונה 👆"
+                    : "דברי מה תרצי לצייר! 🎨"}
+                </p>
+                {mode === "voice" && (
+                  <p className="text-purple-400 font-bold mt-1">
+                    למשל: כלב ורוד, חד קרן, אנה ואלזה...
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Transcript bubble */}
+            {transcript && isIdle && (
+              <div className="card w-full px-6 py-5 text-center border-2 border-purple-200 animate-pop">
+                <p className="text-sm font-bold text-purple-300 mb-1">כרמל אמרה 🎤</p>
+                <p className="text-2xl font-black text-purple-700">"{transcript}"</p>
+              </div>
+            )}
+
+            {/* Mic button */}
+            <VoiceInput
+              status={status}
+              onTranscript={handleTranscript}
+              onListening={() => setStatus("listening")}
+              onCancel={() => setStatus("idle")}
+              disabled={mode === "photo" && !photo}
+            />
+
+            {/* Bouncing arrow pointing UP to mic — only idle with no transcript */}
+            {isIdle && !transcript && mode === "voice" && (
+              <div className="flex flex-col items-center gap-1 -mt-2 opacity-60">
+                <div className="text-2xl animate-bounce">👆</div>
+                <p className="text-purple-400 font-bold text-sm">לחצי כאן!</p>
+              </div>
+            )}
+
           </div>
         )}
 
