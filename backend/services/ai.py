@@ -19,7 +19,7 @@ def make_kid_prompt(idea: str, has_photo: bool = False) -> str:
             f"A 5-year-old Israeli girl named Carmel said (in Hebrew, baby talk, or broken words): '{idea}'. "
             f"Understand what she means and write a prompt to {context} her idea (max 50 words). "
             "IMPORTANT: Do NOT use copyrighted character names (no Disney, Marvel, etc.). "
-            "Describe characters by appearance instead (e.g. 'a girl with ice powers in a blue dress'). "
+            "Describe characters by appearance instead. "
             "Keep it magical, cute, and appropriate for young children. "
             "Return only the image prompt in English, nothing else."
         ),
@@ -32,14 +32,25 @@ def make_improve_prompt(feedback: str, previous_prompt: str) -> str:
         model=TEXT_MODEL,
         contents=(
             f"A 5-year-old Israeli girl wants to improve her painting (feedback in Hebrew or baby talk): '{feedback}'. "
-            f"The current painting is: '{previous_prompt}'. "
-            "Write an editing instruction that KEEPS the existing image and only ADDS or CHANGES what she asked for (max 60 words). "
-            "Start with 'Keep the existing image exactly as is, but...' "
-            "Do NOT use copyrighted character names. Describe by appearance. "
+            f"The current painting shows: '{previous_prompt}'. "
+            "Write a SHORT image editing instruction (max 40 words). "
+            "Start with: 'Edit this image:' then describe ONLY what to add or change. Keep everything else the same. "
+            "Do NOT use copyrighted character names. "
             "Return only the instruction in English, nothing else."
         ),
     )
     return response.text.strip()
+
+
+def _extract_mime_and_bytes(data_url: str):
+    """Extract mime type and raw bytes from a base64 data URL."""
+    if "," in data_url:
+        header, b64data = data_url.split(",", 1)
+        mime = header.split(":")[1].split(";")[0] if ":" in header else "image/jpeg"
+    else:
+        b64data = data_url
+        mime = "image/jpeg"
+    return mime, base64.b64decode(b64data)
 
 
 def _call_image_model(contents) -> str:
@@ -60,11 +71,13 @@ def _call_image_model(contents) -> str:
 
 
 def generate_image(prompt: str) -> str:
+    print(f"[generate_image] prompt: {prompt[:80]}")
     return _call_image_model(prompt)
 
 
-def generate_image_from_photo(prompt: str, photo_b64: str, mime: str = "image/jpeg") -> str:
-    photo_bytes = base64.b64decode(photo_b64.split(",")[-1])
+def generate_image_from_photo(prompt: str, photo_b64: str) -> str:
+    mime, photo_bytes = _extract_mime_and_bytes(photo_b64)
+    print(f"[generate_image_from_photo] mime={mime} size={len(photo_bytes)}b prompt: {prompt[:80]}")
     contents = [
         types.Part.from_bytes(data=photo_bytes, mime_type=mime),
         types.Part.from_text(text=prompt),

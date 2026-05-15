@@ -40,7 +40,9 @@ def paint(req: PaintRequest):
 def improve(req: ImproveRequest):
     prompt = make_improve_prompt(req.feedback, req.previous_prompt)
     if req.current_image:
+        print(f"[improve] using current image as reference, feedback='{req.feedback}'")
         image_url = generate_image_from_photo(prompt, req.current_image)
     else:
+        print(f"[improve] no image reference, regenerating from prompt")
         image_url = generate_image(prompt)
     return PaintResponse(image_url=image_url, prompt_used=prompt)

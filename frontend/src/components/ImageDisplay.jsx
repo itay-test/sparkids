@@ -2,12 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Download, Share2, Sparkles, Wand2 } from "lucide-react";
 
+const IMPROVE_MSGS = [
+  "מוסיפה קסם...",
+  "מערבבת צבעים...",
+  "מפזרת נצנצים...",
+  "הפיה עובדת...",
+  "כמעט מוכן...",
+  "מגעים אחרונים...",
+];
+
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function ImageDisplay({ imageUrl, promptUsed, onShare, onReset, onImproved }) {
   const [improving, setImproving] = useState(false);
   const [listening, setListening]  = useState(false);
   const [liveText, setLiveText]    = useState("");
+  const [msgIdx, setMsgIdx]        = useState(0);
+
+  useEffect(() => {
+    if (!improving) return;
+    setMsgIdx(0);
+    const t = setInterval(() => setMsgIdx(i => (i + 1) % IMPROVE_MSGS.length), 1600);
+    return () => clearInterval(t);
+  }, [improving]);
   const recognitionRef = useRef(null);
   const collectedRef   = useRef("");
 
@@ -56,8 +73,50 @@ export default function ImageDisplay({ imageUrl, promptUsed, onShare, onReset, o
 
   return (
     <div className="flex flex-col gap-4 w-full animate-pop">
-      <div className="card overflow-hidden shadow-xl">
-        <img src={imageUrl} alt="ציור" className="w-full object-cover"/>
+      {/* Image with improve overlay */}
+      <div className="card overflow-hidden shadow-xl relative">
+        <img src={imageUrl} alt="ציור"
+          className={`w-full object-cover transition-all duration-700 ${improving ? "brightness-75 blur-[1px]" : ""}`}/>
+
+        {/* Magic overlay while improving */}
+        {improving && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+            {/* Spinning wand */}
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center animate-spin" style={{animationDuration:"3s"}}>
+                <Wand2 size={36} color="white" strokeWidth={1.5}/>
+              </div>
+              {/* Orbiting sparkles */}
+              {["✨","⭐","💫","🌟"].map((e, i) => (
+                <span key={i} className="absolute text-lg animate-spin"
+                  style={{
+                    animationDuration:"2s",
+                    animationDelay:`${i*0.5}s`,
+                    top:"50%", left:"50%",
+                    transformOrigin:`${28 + i*6}px 0`,
+                    marginTop:"-10px", marginLeft:"-10px",
+                  }}>
+                  {e}
+                </span>
+              ))}
+            </div>
+
+            {/* Rotating message */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-5 py-2 shadow-lg">
+              <p className="text-purple-700 font-black text-xl text-center animate-pop" key={msgIdx}>
+                {IMPROVE_MSGS[msgIdx]}
+              </p>
+            </div>
+
+            {/* Dots */}
+            <div className="flex gap-2">
+              {[0,1,2].map(i => (
+                <div key={i} className="w-2.5 h-2.5 rounded-full bg-white animate-bounce"
+                  style={{animationDelay:`${i*0.2}s`}}/>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Improve */}
