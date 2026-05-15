@@ -44,7 +44,10 @@ export default function ImageDisplay({ imageUrl, promptUsed, onShare, onReset, o
       setImproving(true);
       try {
         const { data } = await axios.post(`${API}/paint/improve`, {
-          feedback: text, previous_prompt: promptUsed, kid_name: "Carmel",
+          feedback: text,
+          previous_prompt: promptUsed,
+          kid_name: "Carmel",
+          current_image: imageUrl,
         });
         onImproved(data);
       } finally { setImproving(false); }

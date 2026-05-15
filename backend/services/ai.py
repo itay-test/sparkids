@@ -31,11 +31,12 @@ def make_improve_prompt(feedback: str, previous_prompt: str) -> str:
     response = _gemini.models.generate_content(
         model=TEXT_MODEL,
         contents=(
-            f"A 5-year-old Israeli girl gave feedback on her AI painting (in Hebrew or baby talk): '{feedback}'. "
-            f"The original image prompt was: '{previous_prompt}'. "
-            "Update the image prompt based on her feedback (max 60 words). "
+            f"A 5-year-old Israeli girl wants to improve her painting (feedback in Hebrew or baby talk): '{feedback}'. "
+            f"The current painting is: '{previous_prompt}'. "
+            "Write an editing instruction that KEEPS the existing image and only ADDS or CHANGES what she asked for (max 60 words). "
+            "Start with 'Keep the existing image exactly as is, but...' "
             "Do NOT use copyrighted character names. Describe by appearance. "
-            "Return only the updated image prompt in English, nothing else."
+            "Return only the instruction in English, nothing else."
         ),
     )
     return response.text.strip()

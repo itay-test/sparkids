@@ -16,6 +16,7 @@ class ImproveRequest(BaseModel):
     feedback: str
     previous_prompt: str
     kid_name: str
+    current_image: Optional[str] = None  # base64 data URL of current image
 
 
 class PaintResponse(BaseModel):
@@ -38,5 +39,8 @@ def paint(req: PaintRequest):
 @router.post("/improve", response_model=PaintResponse)
 def improve(req: ImproveRequest):
     prompt = make_improve_prompt(req.feedback, req.previous_prompt)
-    image_url = generate_image(prompt)
+    if req.current_image:
+        image_url = generate_image_from_photo(prompt, req.current_image)
+    else:
+        image_url = generate_image(prompt)
     return PaintResponse(image_url=image_url, prompt_used=prompt)
