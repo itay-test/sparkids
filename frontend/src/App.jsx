@@ -46,14 +46,9 @@ export default function App() {
     }
   }
 
-  async function handleShare() {
-    if (!result) return;
-    const { data } = await axios.post(`${API}/share/`, {
-      kid_name: "Carmel",
-      image_url: result.image_url,
-      prompt_used: result.prompt_used,
-    });
-    setShareData(data);
+  function cancel() {
+    setStatus("idle");
+    setTranscript("");
   }
 
   function reset() {
@@ -64,61 +59,62 @@ export default function App() {
     setPhoto(null);
   }
 
+  async function handleShare() {
+    if (!result) return;
+    const { data } = await axios.post(`${API}/share/`, {
+      kid_name: "Carmel",
+      image_url: result.image_url,
+      prompt_used: result.prompt_used,
+    });
+    setShareData(data);
+  }
+
   const isIdle = status === "idle";
   const isLoading = status === "loading";
+  const isListening = status === "listening";
   const isDone = status === "done";
 
   return (
     <div className="min-h-screen flex flex-col items-center pb-16 relative overflow-hidden" dir="rtl">
 
-      {/* Animated background decorations */}
+      {/* Animated background */}
       {BG_DECO.map((d, i) => (
-        <span
-          key={i}
-          className="fixed select-none pointer-events-none deco"
-          style={{
-            top: `${d.top}%`,
-            left: `${d.left}%`,
-            fontSize: `${d.size}rem`,
-            opacity: 0.22,
-            "--dur": `${d.dur}s`,
-            "--delay": `${d.delay}s`,
-          }}
-        >
+        <span key={i} className="fixed select-none pointer-events-none deco"
+          style={{ top:`${d.top}%`, left:`${d.left}%`, fontSize:`${d.size}rem`,
+            opacity:0.22, "--dur":`${d.dur}s`, "--delay":`${d.delay}s` }}>
           {d.e}
         </span>
       ))}
 
       {/* Header */}
-      <div className="w-full bg-white/80 backdrop-blur-sm shadow-sm px-6 py-4 flex items-center justify-between mb-6 sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 shimmer-btn rounded-xl flex items-center justify-center text-xl">🎨</div>
-          <span className="text-2xl font-black text-purple-700">Sparkids</span>
+      <div className="w-full bg-white/70 backdrop-blur-sm shadow-sm px-5 py-3 flex items-center justify-between mb-6 sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 shimmer-btn rounded-xl flex items-center justify-center text-lg">🎨</div>
+          <span className="text-xl font-black text-purple-700">Sparkids</span>
         </div>
-        <div className="text-right">
-          <p className="text-xl font-black text-purple-700">כרמל 👑</p>
+        <div className="flex items-center gap-2">
+          {/* Global back/cancel — always visible unless idle with no photo */}
+          {(!isIdle || photo) && (
+            <button onClick={reset}
+              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-400 hover:text-red-400 transition-all text-base">
+              ✕
+            </button>
+          )}
+          <span className="text-lg font-black text-purple-700">כרמל 👑</span>
         </div>
       </div>
 
       <div className="w-full max-w-md px-4 flex flex-col gap-5 relative z-10">
 
-        {/* Hero */}
-        {isIdle && (
-          <div className="text-center animate-pop pt-2">
-            <p className="text-4xl font-black text-purple-800 leading-tight">מה תרצי<br/>לצייר היום?</p>
-          </div>
-        )}
-
-        {/* Mode toggle */}
+        {/* Mode toggle — idle only */}
         {isIdle && (
           <div className="card p-1.5 flex gap-1">
-            {[["voice","🎤","רק קול"],["photo","📸","תמונה + קול"]].map(([m, icon, label]) => (
-              <button key={m}
-                onClick={() => { setMode(m); setPhoto(null); }}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-base transition-all duration-200 ${
-                  mode === m ? "bg-purple-600 text-white shadow-md" : "text-gray-400 hover:text-purple-500"
+            {[["voice","🎤"],["photo","📸"]].map(([m, icon]) => (
+              <button key={m} onClick={() => { setMode(m); setPhoto(null); }}
+                className={`flex-1 py-3 rounded-xl font-black text-2xl transition-all duration-200 ${
+                  mode === m ? "bg-purple-600 text-white shadow-md scale-[1.03]" : "text-gray-300 hover:text-purple-400"
                 }`}>
-                {icon} {label}
+                {icon}
               </button>
             ))}
           </div>
@@ -133,18 +129,23 @@ export default function App() {
             status={status}
             onTranscript={handleTranscript}
             onListening={() => setStatus("listening")}
+            onCancel={cancel}
             disabled={mode === "photo" && !photo}
           />
         )}
 
-        {/* What Carmel said — only the text, no label */}
-        {transcript && !isLoading && !isDone && (
-          <div className="card px-6 py-4 text-center animate-pop">
-            <p className="text-2xl font-black text-purple-700">"{transcript}"</p>
+        {/* Transcript — only text, no label */}
+        {transcript && (isIdle || isListening) && (
+          <div className="card px-6 py-4 text-center animate-pop flex items-center justify-between gap-3">
+            <p className="text-2xl font-black text-purple-700 flex-1">"{transcript}"</p>
+            <button onClick={cancel}
+              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:text-red-400 transition-all shrink-0">
+              ✕
+            </button>
           </div>
         )}
 
-        {/* Funny loading */}
+        {/* Loading */}
         {isLoading && <LoadingScreen />}
 
         {/* Result */}
