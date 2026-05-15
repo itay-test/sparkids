@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Camera, Images, X } from "lucide-react";
 
 export default function PhotoInput({ onPhoto }) {
   const cameraRef  = useRef(null);
@@ -21,46 +22,30 @@ export default function PhotoInput({ onPhoto }) {
 
   if (preview) return (
     <div className="card overflow-hidden relative animate-pop">
-      <img src={preview} alt="תמונה" className="w-full" />
+      <img src={preview} alt="תמונה" className="w-full"/>
       <button onClick={clear}
-        className="absolute top-3 left-3 w-9 h-9 bg-white/90 shadow rounded-full flex items-center justify-center text-red-400 font-bold text-lg">
-        ✕
+        className="absolute top-3 left-3 w-9 h-9 bg-white/90 shadow rounded-full flex items-center justify-center text-gray-400 hover:text-red-400 transition-all">
+        <X size={14}/>
       </button>
-      <p className="text-center text-purple-600 font-bold py-3">✓ עכשיו דברי!</p>
+      <p className="text-center text-purple-600 font-bold py-3 text-lg">✓ עכשיו דברי!</p>
     </div>
   );
 
   return (
     <div className="grid grid-cols-2 gap-4 animate-pop">
-      {/* Camera — mobile opens camera, desktop opens file picker */}
       <label className="cursor-pointer">
         <div className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95 select-none">
-          <span className="text-5xl">📷</span>
+          <Camera size={52} className="text-purple-500" strokeWidth={1.5}/>
           <span className="text-purple-700 font-black">צלמי</span>
         </div>
-        <input
-          ref={cameraRef}
-          type="file"
-          accept="image/*"
-          capture="user"
-          onChange={handleFile}
-          className="hidden"
-        />
+        <input ref={cameraRef} type="file" accept="image/*" capture="user" onChange={handleFile} className="hidden"/>
       </label>
-
-      {/* Gallery — always opens file picker, no capture */}
       <label className="cursor-pointer">
         <div className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95 select-none">
-          <span className="text-5xl">🖼️</span>
+          <Images size={52} className="text-pink-500" strokeWidth={1.5}/>
           <span className="text-purple-700 font-black">גלריה</span>
         </div>
-        <input
-          ref={galleryRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFile}
-          className="hidden"
-        />
+        <input ref={galleryRef} type="file" accept="image/*" onChange={handleFile} className="hidden"/>
       </label>
     </div>
   );

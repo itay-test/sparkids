@@ -5,6 +5,7 @@ import ShareModal from "./components/ShareModal";
 import PhotoInput from "./components/PhotoInput";
 import LoadingScreen from "./components/LoadingScreen";
 import Logo from "./components/Logo";
+import { Mic, Camera, ArrowLeft, X } from "lucide-react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -101,15 +102,14 @@ export default function App() {
           {/* Back — one level */}
           {canGoBack && !isLoading && (
             <button onClick={goBack}
-              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-purple-400 hover:text-purple-700 transition-all text-lg font-bold">
-              ←
+              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-purple-400 hover:text-purple-700 hover:shadow-md transition-all">
+              <ArrowLeft size={18}/>
             </button>
           )}
-          {/* Full reset */}
           {canGoBack && (
             <button onClick={reset}
-              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-300 hover:text-red-400 transition-all text-base">
-              ✕
+              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-300 hover:text-red-400 hover:shadow-md transition-all">
+              <X size={15}/>
             </button>
           )}
           <span className="text-lg font-black text-purple-700">כרמל 👑</span>
@@ -125,12 +125,16 @@ export default function App() {
             <div className="grid grid-cols-2 gap-4 w-full">
               <button onClick={() => setMode("voice")}
                 className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95">
-                <span className="text-6xl">🎤</span>
+                <div className="w-16 h-16 shimmer-btn rounded-full flex items-center justify-center">
+                  <Mic size={34} color="white" strokeWidth={1.5}/>
+                </div>
                 <span className="text-purple-700 font-black text-lg">קול</span>
               </button>
               <button onClick={() => setMode("photo")}
                 className="card p-8 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95">
-                <span className="text-6xl">📸</span>
+                <div className="w-16 h-16 shimmer-btn rounded-full flex items-center justify-center">
+                  <Camera size={34} color="white" strokeWidth={1.5}/>
+                </div>
                 <span className="text-purple-700 font-black text-lg">תמונה</span>
               </button>
             </div>
