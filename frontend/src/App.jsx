@@ -8,6 +8,7 @@ import SongPlayer from "./components/SongPlayer";
 import VoiceClone from "./components/VoiceClone";
 import InstrumentPicker from "./components/InstrumentPicker";
 import CharacterPicker from "./components/CharacterPicker";
+import MelodyPicker from "./components/MelodyPicker";
 import StoryPlayer from "./components/StoryPlayer";
 import Logo from "./components/Logo";
 import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star, Music2, BookOpen } from "lucide-react";
@@ -40,9 +41,11 @@ export default function App() {
   const [voiceChecked, setVoiceChecked] = useState(false);
   const [instruments, setInstruments] = useState(null); // null=not chosen, []=any
   const [songStep, setSongStep]   = useState("mode"); // mode|instruments|mic
-  const [storyChar, setStoryChar] = useState(null);
-  const [storyStep, setStoryStep] = useState("mode"); // mode|character|mic
-  const [storyData, setStoryData] = useState(null);
+  const [storyChar, setStoryChar]     = useState(null);
+  const [storyMood, setStoryMood]     = useState(null);
+  const [storyVideo, setStoryVideo]   = useState(false);
+  const [storyStep, setStoryStep]     = useState("mode"); // mode|character|melody|mic
+  const [storyData, setStoryData]     = useState(null);
   const abortRef                  = useRef(null);
   const [shareData, setShareData] = useState(null);
   const [mode, setMode]           = useState(null);   // null = not chosen yet
@@ -57,7 +60,8 @@ export default function App() {
     try {
       if (mode === "story") {
         const { data } = await axios.post(`${API}/story/`,
-          { idea: text, kid_name: "Carmel", character_id: storyChar },
+          { idea: text, kid_name: "Carmel", character_id: storyChar,
+            melody_mood: storyMood, include_video: storyVideo },
           { signal: controller.signal });
         setStoryData(data);
       } else if (mode === "song") {
@@ -105,7 +109,8 @@ export default function App() {
     setStatus("idle"); setTranscript(""); setResult(null);
     setSong(null); setShareData(null); setPhoto(null);
     setMode(null); setInstruments(null); setSongStep("mode");
-    setStoryChar(null); setStoryStep("mode"); setStoryData(null);
+    setStoryChar(null); setStoryMood(null); setStoryVideo(false);
+    setStoryStep("mode"); setStoryData(null);
   }
 
   async function handleShare() {
@@ -226,9 +231,43 @@ export default function App() {
         {/* Story: character picker */}
         {mode === "story" && isIdle && storyStep === "character" && (
           <CharacterPicker
-            onSelect={(id) => { setStoryChar(id); setStoryStep("mic"); }}
+            onSelect={(id) => { setStoryChar(id); setStoryStep("melody"); }}
             onBack={() => { setMode(null); setStoryStep("mode"); }}
           />
+        )}
+
+        {/* Story: melody + video picker */}
+        {mode === "story" && isIdle && storyStep === "melody" && (
+          <div className="flex flex-col gap-4 animate-pop w-full">
+            <MelodyPicker
+              onConfirm={(mood) => { setStoryMood(mood); setStoryStep("video"); }}
+              onBack={() => setStoryStep("character")}
+            />
+          </div>
+        )}
+
+        {/* Story: video toggle */}
+        {mode === "story" && isIdle && storyStep === "video" && (
+          <div className="flex flex-col gap-5 animate-pop w-full">
+            <div className="text-center">
+              <p className="text-3xl font-black text-purple-800">רוצה גם סרטון? 🎬</p>
+              <p className="text-purple-300 font-bold text-sm mt-1">תמונות לכל סצנה בסיפור</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => { setStoryVideo(true); setStoryStep("mic"); }}
+                className="card py-8 flex flex-col items-center gap-3 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-purple-200">
+                <span className="text-5xl">🎬</span>
+                <span className="text-purple-700 font-black text-lg">כן! עם תמונות</span>
+                <span className="text-purple-300 text-xs text-center">קצת יותר זמן</span>
+              </button>
+              <button onClick={() => { setStoryVideo(false); setStoryStep("mic"); }}
+                className="card py-8 flex flex-col items-center gap-3 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-purple-200">
+                <span className="text-5xl">🎧</span>
+                <span className="text-purple-700 font-black text-lg">רק הקול</span>
+                <span className="text-purple-300 text-xs text-center">מהיר יותר</span>
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Step 2 — instrument picker (song mode) */}
@@ -242,11 +281,13 @@ export default function App() {
         {/* Step 2/3 — mic screen */}
         {mode && !isDone && !isLoading &&
          (mode !== "song"  || songStep  === "mic") &&
-         (mode !== "story" || storyStep === "mic") && (
+         (mode !== "story" || storyStep === "mic") &&
+         storyStep !== "character" && storyStep !== "melody" && storyStep !== "video" && (
           <div className="flex flex-col items-center gap-6 animate-pop">
 
             {/* Big instruction card */}
-            {isIdle && !transcript && songStep !== "instruments" && storyStep !== "character" && (
+            {isIdle && !transcript && songStep !== "instruments" &&
+             !["character","melody","video"].includes(storyStep) && (
               <div className="card w-full px-6 py-6 text-center border-2 border-purple-100">
                 <div className="flex justify-center mb-3">
                   {mode === "photo" && !photo ? <ImagePlus size={44} className="text-pink-400" strokeWidth={1.5}/>
@@ -320,7 +361,10 @@ export default function App() {
         {isDone && storyData && (
           <StoryPlayer
             storyText={storyData.story_text}
+            scenes={storyData.scenes}
+            sceneImages={storyData.scene_images}
             audioUrl={storyData.audio_url}
+            melodyUrl={storyData.melody_url}
             characterId={storyData.character_id}
             onReset={reset}
           />
