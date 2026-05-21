@@ -40,7 +40,7 @@ export default function App() {
   const [mode, setMode]           = useState(null);   // null = not chosen yet
   const [photo, setPhoto]         = useState(null);
 
-  async function handleTranscript(text) {
+  async function handleTranscript(text, audioB64 = null) {
     if (!text) { setStatus("idle"); return; }
     setTranscript(text);
     setStatus("loading");
@@ -48,9 +48,11 @@ export default function App() {
     abortRef.current = controller;
     try {
       if (mode === "song") {
-        const { data } = await axios.post(`${API}/song/`, { idea: text, kid_name: "Carmel" },
+        const { data } = await axios.post(`${API}/song/`,
+          { idea: text, kid_name: "Carmel", voice_audio_b64: audioB64 },
           { signal: controller.signal });
         setSong(data);
+        setHasClonedVoice(true);
       } else {
         const payload = { idea: text, kid_name: "Carmel" };
         if (photo) payload.photo = photo;
@@ -81,18 +83,8 @@ export default function App() {
     if (mode)                   { setMode(null);  return; }
   }
 
-  async function selectSongMode() {
-    setMode("song");
-    if (!voiceChecked) {
-      try {
-        const { data } = await axios.get(`${API}/voice/status/Carmel`);
-        setHasClonedVoice(data.has_voice);
-        setVoiceChecked(true);
-        if (!data.has_voice) setShowClone(true); // no voice yet → clone first
-      } catch { setVoiceChecked(true); }
-    } else if (!hasClonedVoice) {
-      setShowClone(true);
-    }
+  function selectSongMode() {
+    setMode("song"); // voice is captured automatically during mic recording
   }
 
   function reset() {
@@ -220,7 +212,7 @@ export default function App() {
                     : "דברי מה תרצי!"}
                 </p>
                 <p className="text-purple-300 font-bold text-sm mt-1">
-                  {mode === "song" ? "כלב • חד קרן • ספינת חלל" : "כלב ורוד • חד קרן • נסיכה"}
+                  {mode === "song" ? "השיר יושר בקולך!" : "כלב ורוד • חד קרן • נסיכה"}
                 </p>
               </div>
             )}
@@ -240,6 +232,7 @@ export default function App() {
               onListening={() => setStatus("listening")}
               onCancel={() => setStatus("idle")}
               disabled={mode === "photo" && !photo}
+              captureAudio={mode === "song"}
             />
 
             {/* Bouncing finger — points at mic */}

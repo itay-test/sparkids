@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, X } from "lucide-react";
 
-export default function VoiceInput({ status, onTranscript, onListening, onCancel, disabled }) {
+export default function VoiceInput({ status, onTranscript, onListening, onCancel, disabled, captureAudio = false }) {
   const recognitionRef = useRef(null);
+  const recorderRef    = useRef(null);
+  const chunksRef      = useRef([]);
+  const interimRef     = useRef("");
   const [interim, setInterim] = useState("");
-  const [error, setError] = useState("");
-  const interimRef = useRef("");
+  const [error, setError]     = useState("");
 
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -33,20 +35,49 @@ export default function VoiceInput({ status, onTranscript, onListening, onCancel
     return () => { window.removeEventListener("mouseup", handler); window.removeEventListener("touchend", handler); };
   }, [status]);
 
-  function triggerStop() {
+  async function start() {
+    if (status !== "idle" || !recognitionRef.current || disabled) return;
+    setInterim(""); setError(""); interimRef.current = ""; chunksRef.current = [];
+
+    // start audio recording if requested
+    if (captureAudio) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const rec = new MediaRecorder(stream, { mimeType: "audio/webm" });
+        rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        rec.start(100);
+        recorderRef.current = { recorder: rec, stream };
+      } catch { /* mic already open via SpeechRecognition, skip */ }
+    }
+
+    onListening();
+    recognitionRef.current.start();
+  }
+
+  async function triggerStop() {
     recognitionRef.current?.stop();
+
+    // stop audio recorder
+    let audioB64 = null;
+    if (captureAudio && recorderRef.current) {
+      const { recorder, stream } = recorderRef.current;
+      recorder.stop();
+      stream.getTracks().forEach(t => t.stop());
+      recorderRef.current = null;
+      await new Promise(r => setTimeout(r, 400));
+      if (chunksRef.current.length > 0) {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const buf  = await blob.arrayBuffer();
+        audioB64   = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      }
+    }
+
     setTimeout(() => {
       const text = interimRef.current.trim();
       setInterim(""); interimRef.current = "";
-      if (text.length > 0) onTranscript(text);
-      else { setError("לא שמעתי, נסי שוב!"); onTranscript(null); }
+      if (text.length > 0) onTranscript(text, audioB64);
+      else { setError("לא שמעתי, נסי שוב!"); onTranscript(null, null); }
     }, 300);
-  }
-
-  function start() {
-    if (status !== "idle" || !recognitionRef.current || disabled) return;
-    setInterim(""); setError(""); interimRef.current = "";
-    onListening(); recognitionRef.current.start();
   }
 
   const isListening = status === "listening";
@@ -67,7 +98,7 @@ export default function VoiceInput({ status, onTranscript, onListening, onCancel
       </button>
 
       {isListening && (
-        <button onClick={() => { recognitionRef.current?.abort(); setInterim(""); interimRef.current = ""; onCancel(); }}
+        <button onClick={() => { recognitionRef.current?.abort(); recorderRef.current?.recorder?.stop(); recorderRef.current?.stream?.getTracks().forEach(t=>t.stop()); setInterim(""); interimRef.current = ""; onCancel(); }}
           className="w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 hover:text-red-400 transition-all">
           <X size={15}/>
         </button>
