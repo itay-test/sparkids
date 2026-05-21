@@ -20,27 +20,25 @@ VOICE_MAP = {
 
 
 def analyze_voice(audio_bytes: bytes) -> str:
-    """Use Gemini to detect voice type from audio sample. Returns voice_name."""
+    """Use Gemini to detect voice type. Returns one of: man, woman, girl, boy, default."""
     try:
         response = _gemini.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
                 types.Part(inline_data=types.Blob(data=audio_bytes, mime_type="audio/webm")),
                 types.Part(text=(
-                    "Listen to this voice recording. "
-                    "Answer with ONE word only — the best description: man, woman, girl, or boy. "
-                    "Base it only on the voice characteristics (pitch, tone)."
+                    "Listen to this voice. Answer with ONE word only: man, woman, girl, or boy."
                 )),
             ]
         )
         label = response.text.strip().lower()
         print(f"[voice] detected: {label}")
-        for key in VOICE_MAP:
+        for key in ["man", "woman", "girl", "boy"]:
             if key in label:
-                return VOICE_MAP[key]
+                return key
     except Exception as e:
         print(f"[voice] analysis failed: {e}")
-    return VOICE_MAP["default"]
+    return "default"
 
 
 def pcm_to_wav(pcm_bytes: bytes, sample_rate: int = 24000, channels: int = 1, bit_depth: int = 16) -> bytes:
