@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, RotateCcw, Sparkles, Music2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Sparkles, Music2, Mic } from "lucide-react";
 
-export default function SongPlayer({ audioUrl, lyrics, onReset }) {
+export default function SongPlayer({ audioUrl, lyrics, hasClonedVoice, onReset, onCloneVoice }) {
   const audioRef  = useRef(null);
   const [playing, setPlaying]   = useState(false);
   const [progress, setProgress] = useState(0);
@@ -93,12 +93,27 @@ export default function SongPlayer({ audioUrl, lyrics, onReset }) {
         </div>
       )}
 
-      {/* New song */}
-      <button onClick={onReset}
-        className="card py-4 flex items-center justify-center gap-3 text-purple-600 font-black hover:shadow-lg active:scale-95 transition-all border-2 border-purple-100">
-        <Music2 size={22} strokeWidth={2}/>
-        שיר חדש
-      </button>
+      <div className="grid grid-cols-2 gap-3">
+        {/* Clone voice button */}
+        <button onClick={onCloneVoice}
+          className={`card py-4 flex flex-col items-center gap-2 hover:shadow-lg active:scale-95 transition-all border-2 ${hasClonedVoice ? "border-green-200" : "border-purple-100"}`}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${hasClonedVoice ? "bg-green-100" : "bg-purple-100"}`}>
+            <Mic size={20} className={hasClonedVoice ? "text-green-600" : "text-purple-600"} strokeWidth={2}/>
+          </div>
+          <span className={`text-xs font-black ${hasClonedVoice ? "text-green-600" : "text-purple-600"}`}>
+            {hasClonedVoice ? "הקול שלי ✓" : "הקול שלי"}
+          </span>
+        </button>
+
+        {/* New song */}
+        <button onClick={onReset}
+          className="card py-4 flex flex-col items-center gap-2 hover:shadow-lg active:scale-95 transition-all border-2 border-purple-100">
+          <div className="w-10 h-10 rounded-2xl bg-purple-100 flex items-center justify-center">
+            <Music2 size={20} className="text-purple-600" strokeWidth={2}/>
+          </div>
+          <span className="text-xs font-black text-purple-600">שיר חדש</span>
+        </button>
+      </div>
 
       <audio ref={audioRef} src={audioUrl} preload="auto"/>
     </div>

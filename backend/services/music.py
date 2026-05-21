@@ -23,7 +23,7 @@ def make_song_prompt(idea: str) -> str:
     return response.text.strip()
 
 
-def generate_song(idea: str) -> dict:
+def generate_song(idea: str, voice_id: str = None) -> dict:
     """Generate a children's song. Returns {audio_url, lyrics, prompt_used}."""
     raw = make_song_prompt(idea)
 
@@ -59,10 +59,24 @@ def generate_song(idea: str) -> dict:
         if part.inline_data is not None:
             mime = part.inline_data.mime_type
             data = base64.b64encode(part.inline_data.data).decode("utf-8")
+            lyria_audio_url = f"data:{mime};base64,{data}"
+
+            # if cloned voice available, also generate vocals with it
+            vocals_url = None
+            if voice_id:
+                try:
+                    from services.voice import sing_with_voice
+                    vocals_url = sing_with_voice(lyrics, voice_id)
+                    print(f"[generate_song] vocals generated with voice_id={voice_id}")
+                except Exception as e:
+                    print(f"[generate_song] vocals failed: {e}")
+
             return {
-                "audio_url": f"data:{mime};base64,{data}",
+                "audio_url": vocals_url or lyria_audio_url,
+                "instrumental_url": lyria_audio_url,
                 "lyrics": lyrics,
                 "prompt_used": lyria_prompt[:200],
+                "has_cloned_voice": bool(vocals_url),
             }
 
     raise RuntimeError("Lyria returned no audio")

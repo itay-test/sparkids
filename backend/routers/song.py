@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from services.music import generate_song
+from routers.voice import _voice_store
 
 router = APIRouter()
 
@@ -10,13 +11,8 @@ class SongRequest(BaseModel):
     kid_name: str
 
 
-class SongResponse(BaseModel):
-    audio_url: str
-    lyrics: str
-    prompt_used: str
-
-
-@router.post("/", response_model=SongResponse)
+@router.post("/")
 def create_song(req: SongRequest):
-    result = generate_song(req.idea)
-    return SongResponse(**result)
+    voice_id = _voice_store.get(req.kid_name)
+    result = generate_song(req.idea, voice_id=voice_id)
+    return result

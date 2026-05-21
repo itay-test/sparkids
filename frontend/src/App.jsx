@@ -5,6 +5,7 @@ import ShareModal from "./components/ShareModal";
 import PhotoInput from "./components/PhotoInput";
 import LoadingScreen from "./components/LoadingScreen";
 import SongPlayer from "./components/SongPlayer";
+import VoiceClone from "./components/VoiceClone";
 import Logo from "./components/Logo";
 import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star, Music2 } from "lucide-react";
 import axios from "axios";
@@ -31,6 +32,8 @@ export default function App() {
   const [transcript, setTranscript] = useState("");
   const [result, setResult]       = useState(null);
   const [song, setSong]           = useState(null);
+  const [showClone, setShowClone] = useState(false);
+  const [hasClonedVoice, setHasClonedVoice] = useState(false);
   const abortRef                  = useRef(null);
   const [shareData, setShareData] = useState(null);
   const [mode, setMode]           = useState(null);   // null = not chosen yet
@@ -260,7 +263,17 @@ export default function App() {
           <SongPlayer
             audioUrl={song.audio_url}
             lyrics={song.lyrics}
+            hasClonedVoice={hasClonedVoice}
             onReset={reset}
+            onCloneVoice={() => setShowClone(true)}
+          />
+        )}
+
+        {/* Voice clone modal */}
+        {showClone && (
+          <VoiceClone
+            onCloned={() => setHasClonedVoice(true)}
+            onClose={() => setShowClone(false)}
           />
         )}
 
