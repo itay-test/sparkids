@@ -34,6 +34,7 @@ export default function App() {
   const [song, setSong]           = useState(null);
   const [showClone, setShowClone] = useState(false);
   const [hasClonedVoice, setHasClonedVoice] = useState(false);
+  const [voiceChecked, setVoiceChecked] = useState(false);
   const abortRef                  = useRef(null);
   const [shareData, setShareData] = useState(null);
   const [mode, setMode]           = useState(null);   // null = not chosen yet
@@ -78,6 +79,20 @@ export default function App() {
     if (status === "listening") { setStatus("idle"); return; }
     if (photo)                  { setPhoto(null); return; }
     if (mode)                   { setMode(null);  return; }
+  }
+
+  async function selectSongMode() {
+    setMode("song");
+    if (!voiceChecked) {
+      try {
+        const { data } = await axios.get(`${API}/voice/status/Carmel`);
+        setHasClonedVoice(data.has_voice);
+        setVoiceChecked(true);
+        if (!data.has_voice) setShowClone(true); // no voice yet → clone first
+      } catch { setVoiceChecked(true); }
+    } else if (!hasClonedVoice) {
+      setShowClone(true);
+    }
   }
 
   function reset() {
@@ -170,7 +185,7 @@ export default function App() {
               </button>
             </div>
             {/* Song mode — full width */}
-            <button onClick={() => setMode("song")}
+            <button onClick={selectSongMode}
               className="card w-full py-6 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
               <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg shrink-0"
                 style={{background:"linear-gradient(135deg,#a855f7,#ec4899,#f97316)"}}>
@@ -272,8 +287,8 @@ export default function App() {
         {/* Voice clone modal */}
         {showClone && (
           <VoiceClone
-            onCloned={() => setHasClonedVoice(true)}
-            onClose={() => setShowClone(false)}
+            onCloned={() => { setHasClonedVoice(true); setShowClone(false); }}
+            onClose={() => { setShowClone(false); if (!hasClonedVoice) setMode(null); }}
           />
         )}
 
