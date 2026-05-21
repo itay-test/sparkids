@@ -4,8 +4,9 @@ import ImageDisplay from "./components/ImageDisplay";
 import ShareModal from "./components/ShareModal";
 import PhotoInput from "./components/PhotoInput";
 import LoadingScreen from "./components/LoadingScreen";
+import SongPlayer from "./components/SongPlayer";
 import Logo from "./components/Logo";
-import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star } from "lucide-react";
+import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star, Music2 } from "lucide-react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -29,6 +30,7 @@ export default function App() {
   const [status, setStatus]       = useState("idle");
   const [transcript, setTranscript] = useState("");
   const [result, setResult]       = useState(null);
+  const [song, setSong]           = useState(null);
   const [shareData, setShareData] = useState(null);
   const [mode, setMode]           = useState(null);   // null = not chosen yet
   const [photo, setPhoto]         = useState(null);
@@ -38,10 +40,15 @@ export default function App() {
     setTranscript(text);
     setStatus("loading");
     try {
-      const payload = { idea: text, kid_name: "Carmel" };
-      if (photo) payload.photo = photo;
-      const { data } = await axios.post(`${API}/paint/`, payload);
-      setResult(data);
+      if (mode === "song") {
+        const { data } = await axios.post(`${API}/song/`, { idea: text, kid_name: "Carmel" });
+        setSong(data);
+      } else {
+        const payload = { idea: text, kid_name: "Carmel" };
+        if (photo) payload.photo = photo;
+        const { data } = await axios.post(`${API}/paint/`, payload);
+        setResult(data);
+      }
       setStatus("done");
     } catch {
       setStatus("idle");
@@ -58,7 +65,7 @@ export default function App() {
 
   function reset() {
     setStatus("idle"); setTranscript(""); setResult(null);
-    setShareData(null); setPhoto(null); setMode(null);
+    setSong(null); setShareData(null); setPhoto(null); setMode(null);
   }
 
   async function handleShare() {
@@ -133,7 +140,7 @@ export default function App() {
                 <div className="w-20 h-20 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
                   <Mic size={40} color="white" strokeWidth={1.5}/>
                 </div>
-                <span className="text-purple-700 font-black text-xl">דברי</span>
+                <span className="text-purple-700 font-black text-xl">ציור</span>
                 <span className="text-purple-300 font-bold text-xs text-center">תגידי מה תרצי<br/>ואני אצייר</span>
               </button>
               <button onClick={() => setMode("photo")}
@@ -145,6 +152,18 @@ export default function App() {
                 <span className="text-purple-300 font-bold text-xs text-center">צלמי תמונה<br/>ואני אקשט אותה</span>
               </button>
             </div>
+            {/* Song mode — full width */}
+            <button onClick={() => setMode("song")}
+              className="card w-full py-6 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg shrink-0"
+                style={{background:"linear-gradient(135deg,#a855f7,#ec4899,#f97316)"}}>
+                <Music2 size={32} color="white" strokeWidth={1.5}/>
+              </div>
+              <div className="text-right">
+                <p className="text-purple-700 font-black text-xl">שיר</p>
+                <p className="text-purple-300 font-bold text-sm">תגידי על מה השיר<br/>ואני אלחין ואשיר</p>
+              </div>
+            </button>
           </div>
         )}
 
@@ -155,21 +174,22 @@ export default function App() {
         {mode && !isDone && !isLoading && (
           <div className="flex flex-col items-center gap-6 animate-pop">
 
-            {/* Big instruction card — only when idle */}
+            {/* Big instruction card */}
             {isIdle && !transcript && (
               <div className="card w-full px-6 py-6 text-center border-2 border-purple-100">
                 <div className="flex justify-center mb-3">
-                  {mode === "photo" && !photo
-                    ? <ImagePlus size={44} className="text-pink-400" strokeWidth={1.5}/>
-                    : <Paintbrush2 size={44} className="text-purple-500" strokeWidth={1.5}/>
-                  }
+                  {mode === "photo" && !photo ? <ImagePlus size={44} className="text-pink-400" strokeWidth={1.5}/>
+                    : mode === "song" ? <Music2 size={44} className="text-pink-500" strokeWidth={1.5}/>
+                    : <Paintbrush2 size={44} className="text-purple-500" strokeWidth={1.5}/>}
                 </div>
                 <p className="text-2xl font-black text-purple-800">
-                  {mode === "photo" && !photo ? "בחרי תמונה" : "דברי מה תרצי!"}
+                  {mode === "photo" && !photo ? "בחרי תמונה"
+                    : mode === "song" ? "על מה השיר?"
+                    : "דברי מה תרצי!"}
                 </p>
-                {mode === "voice" && (
-                  <p className="text-purple-300 font-bold text-sm mt-1">כלב ורוד • חד קרן • נסיכה</p>
-                )}
+                <p className="text-purple-300 font-bold text-sm mt-1">
+                  {mode === "song" ? "כלב • חד קרן • ספינת חלל" : "כלב ורוד • חד קרן • נסיכה"}
+                </p>
               </div>
             )}
 
@@ -191,7 +211,7 @@ export default function App() {
             />
 
             {/* Bouncing finger — points at mic */}
-            {isIdle && !transcript && mode === "voice" && (
+            {isIdle && !transcript && (mode === "voice" || mode === "song") && (
               <div className="text-3xl animate-bounce -mt-2 opacity-50">👆</div>
             )}
 
@@ -201,7 +221,7 @@ export default function App() {
         {/* Loading */}
         {isLoading && <LoadingScreen />}
 
-        {/* Result */}
+        {/* Painting result */}
         {isDone && result && (
           <ImageDisplay
             imageUrl={result.image_url}
@@ -209,6 +229,15 @@ export default function App() {
             onShare={handleShare}
             onReset={reset}
             onImproved={(data) => setResult(data)}
+          />
+        )}
+
+        {/* Song result */}
+        {isDone && song && (
+          <SongPlayer
+            audioUrl={song.audio_url}
+            lyrics={song.lyrics}
+            onReset={reset}
           />
         )}
 

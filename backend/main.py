@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import paint, share
+from routers import paint, share, song
 
 app = FastAPI(title="Sparkids API")
 
@@ -20,6 +20,7 @@ app.add_middleware(
 
 app.include_router(paint.router, prefix="/paint", tags=["paint"])
 app.include_router(share.router, prefix="/share", tags=["share"])
+app.include_router(song.router, prefix="/song", tags=["song"])
 
 
 @app.get("/health")
