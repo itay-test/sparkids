@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import VoiceInput from "./components/VoiceInput";
 import ImageDisplay from "./components/ImageDisplay";
 import ShareModal from "./components/ShareModal";
@@ -31,6 +31,7 @@ export default function App() {
   const [transcript, setTranscript] = useState("");
   const [result, setResult]       = useState(null);
   const [song, setSong]           = useState(null);
+  const abortRef                  = useRef(null);
   const [shareData, setShareData] = useState(null);
   const [mode, setMode]           = useState(null);   // null = not chosen yet
   const [photo, setPhoto]         = useState(null);
@@ -39,20 +40,33 @@ export default function App() {
     if (!text) { setStatus("idle"); return; }
     setTranscript(text);
     setStatus("loading");
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       if (mode === "song") {
-        const { data } = await axios.post(`${API}/song/`, { idea: text, kid_name: "Carmel" });
+        const { data } = await axios.post(`${API}/song/`, { idea: text, kid_name: "Carmel" },
+          { signal: controller.signal });
         setSong(data);
       } else {
         const payload = { idea: text, kid_name: "Carmel" };
         if (photo) payload.photo = photo;
-        const { data } = await axios.post(`${API}/paint/`, payload);
+        const { data } = await axios.post(`${API}/paint/`, payload,
+          { signal: controller.signal });
         setResult(data);
       }
       setStatus("done");
-    } catch {
-      setStatus("idle");
+    } catch (e) {
+      if (axios.isCancel(e)) { setStatus("idle"); setTranscript(""); }
+      else setStatus("idle");
+    } finally {
+      abortRef.current = null;
     }
+  }
+
+  function cancelLoading() {
+    abortRef.current?.abort();
+    setStatus("idle");
+    setTranscript("");
   }
 
   // go back one level
@@ -219,7 +233,16 @@ export default function App() {
         )}
 
         {/* Loading */}
-        {isLoading && <LoadingScreen />}
+        {isLoading && (
+          <>
+            <LoadingScreen mode={mode}/>
+            <button onClick={cancelLoading}
+              className="card w-full py-4 flex items-center justify-center gap-3 text-gray-400 font-black hover:text-red-400 hover:shadow-md active:scale-95 transition-all border-2 border-gray-100">
+              <X size={20}/>
+              ביטול
+            </button>
+          </>
+        )}
 
         {/* Painting result */}
         {isDone && result && (
