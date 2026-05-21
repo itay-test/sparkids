@@ -1,58 +1,80 @@
 import os
 import base64
-from elevenlabs.client import ElevenLabs
-from elevenlabs import VoiceSettings
+import struct
+import pathlib
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
+_gemini = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
-_eleven = None
-
-def _client():
-    global _eleven
-    if _eleven is None:
-        key = os.environ.get("ELEVENLABS_API_KEY")
-        if not key:
-            raise RuntimeError("ELEVENLABS_API_KEY not set")
-        _eleven = ElevenLabs(api_key=key)
-    return _eleven
+# voice map: gender+age → best Gemini TTS voice
+VOICE_MAP = {
+    "man":          "Charon",   # deep, masculine
+    "woman":        "Kore",     # warm, feminine
+    "girl":         "Aoede",    # bright, young female
+    "boy":          "Puck",     # energetic, young male
+    "default":      "Zephyr",   # neutral, clear
+}
 
 
-def clone_voice(audio_bytes: bytes, name: str = "Carmel") -> str:
-    """Upload a voice sample and return the cloned voice_id."""
-    client = _client()
-    voice = client.voices.ivc.create(
-        name=name,
-        files=[("carmel_voice.webm", audio_bytes, "audio/webm")],
-        description="Carmel's voice for Sparkids",
+def analyze_voice(audio_bytes: bytes) -> str:
+    """Use Gemini to detect voice type from audio sample. Returns voice_name."""
+    try:
+        response = _gemini.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                types.Part(inline_data=types.Blob(data=audio_bytes, mime_type="audio/webm")),
+                types.Part(text=(
+                    "Listen to this voice recording. "
+                    "Answer with ONE word only — the best description: man, woman, girl, or boy. "
+                    "Base it only on the voice characteristics (pitch, tone)."
+                )),
+            ]
+        )
+        label = response.text.strip().lower()
+        print(f"[voice] detected: {label}")
+        for key in VOICE_MAP:
+            if key in label:
+                return VOICE_MAP[key]
+    except Exception as e:
+        print(f"[voice] analysis failed: {e}")
+    return VOICE_MAP["default"]
+
+
+def pcm_to_wav(pcm_bytes: bytes, sample_rate: int = 24000, channels: int = 1, bit_depth: int = 16) -> bytes:
+    """Wrap raw PCM in a WAV header."""
+    byte_rate = sample_rate * channels * bit_depth // 8
+    block_align = channels * bit_depth // 8
+    data_size = len(pcm_bytes)
+    header = struct.pack(
+        "<4sI4s4sIHHIIHH4sI",
+        b"RIFF", 36 + data_size, b"WAVE",
+        b"fmt ", 16, 1, channels, sample_rate, byte_rate, block_align, bit_depth,
+        b"data", data_size,
     )
-    print(f"[clone_voice] created voice_id={voice.voice_id}")
-    return voice.voice_id
+    return header + pcm_bytes
 
 
-def get_voices() -> list:
-    """List all cloned voices."""
-    client = _client()
-    return [{"id": v.voice_id, "name": v.name}
-            for v in client.voices.get_all().voices
-            if v.category == "cloned"]
-
-
-def sing_with_voice(lyrics: str, voice_id: str) -> str:
-    """Generate speech/song with cloned voice, return base64 data URL."""
-    client = _client()
-    audio = client.text_to_speech.convert(
-        voice_id=voice_id,
-        text=lyrics,
-        model_id="eleven_multilingual_v2",
-        voice_settings=VoiceSettings(
-            stability=0.4,
-            similarity_boost=0.85,
-            style=0.3,
-            use_speaker_boost=True,
-        ),
+def sing_with_voice(text: str, voice_name: str) -> str:
+    """Generate TTS with Gemini using a matched voice. Returns base64 data URL."""
+    response = _gemini.models.generate_content(
+        model="gemini-2.5-flash-preview-tts",
+        contents=f"Read this expressively and warmly as a children's song: {text}",
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice_name)
+                )
+            )
+        )
     )
-    # audio is a generator — collect bytes
-    chunks = b"".join(audio)
-    b64 = base64.b64encode(chunks).decode("utf-8")
-    return f"data:audio/mpeg;base64,{b64}"
+    for part in response.candidates[0].content.parts:
+        if part.inline_data is not None:
+            raw = part.inline_data.data
+            wav = pcm_to_wav(raw)
+            b64 = base64.b64encode(wav).decode("utf-8")
+            return f"data:audio/wav;base64,{b64}"
+    raise RuntimeError("Gemini TTS returned no audio")
