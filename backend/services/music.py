@@ -19,6 +19,15 @@ VOICE_STYLES = {
     "default":"sung by a friendly warm voice",
 }
 
+# Gemini TTS voice per detected type (for vocal track)
+TTS_VOICES = {
+    "man":    "Charon",
+    "woman":  "Kore",
+    "girl":   "Aoede",
+    "boy":    "Puck",
+    "default":"Zephyr",
+}
+
 
 def make_kid_prompt(idea: str, has_photo: bool = False) -> str:
     context = "enhance the uploaded photo based on" if has_photo else "create a painting of"
@@ -73,43 +82,81 @@ def make_song_lyrics(idea: str) -> tuple:
     return lyrics, style
 
 
-def generate_song(idea: str, voice_type: str = "default", instruments: list = None) -> dict:
-    """Generate a children's song with Lyria. voice_type affects the vocal style."""
-    lyrics, style = make_song_lyrics(idea)
-    voice_style = VOICE_STYLES.get(voice_type, VOICE_STYLES["default"])
+def _pcm_to_wav(pcm: bytes, rate: int = 24000) -> bytes:
+    import struct
+    n = len(pcm)
+    hdr = struct.pack("<4sI4s4sIHHIIHH4sI",
+        b"RIFF", 36+n, b"WAVE", b"fmt ", 16,
+        1, 1, rate, rate*2, 2, 16, b"data", n)
+    return hdr + pcm
 
-    instrument_str = ""
-    if instruments:
-        instrument_str = f"featuring {', '.join(instruments)}. "
 
-    lyria_prompt = (
-        f"{style}. {instrument_str}{voice_style}. "
-        f"Hebrew children's song. Vocals singing these lyrics: {lyrics}"
+def _gemini_tts_vocals(lyrics: str, voice_name: str) -> str:
+    """Sing lyrics with Gemini TTS in the matched voice. Returns base64 data URL."""
+    resp = _gemini.models.generate_content(
+        model="gemini-2.5-flash-preview-tts",
+        contents=f"Sing these Hebrew children's song lyrics expressively with rhythm:\n\n{lyrics}",
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice_name)
+                )
+            )
+        )
     )
-    print(f"[song] voice={voice_type} instruments={instruments} | style={style[:40]}")
+    for part in resp.candidates[0].content.parts:
+        if part.inline_data is not None:
+            wav = _pcm_to_wav(part.inline_data.data)
+            return f"data:audio/wav;base64,{base64.b64encode(wav).decode()}"
+    raise RuntimeError("TTS returned no audio")
 
+
+def _lyria_instrumental(prompt: str) -> str:
+    """Generate instrumental track with Lyria. Returns base64 data URL."""
     response = _gemini.models.generate_content(
         model=MUSIC_MODEL,
-        contents=lyria_prompt,
+        contents=prompt,
         config=types.GenerateContentConfig(response_modalities=["AUDIO"]),
     )
-
     candidate = response.candidates[0]
     if candidate.content is None:
-        raise RuntimeError(f"Song blocked: {candidate.finish_reason}")
-
+        raise RuntimeError(f"Lyria blocked: {candidate.finish_reason}")
     for part in candidate.content.parts:
         if part.inline_data is not None:
             mime = part.inline_data.mime_type
             data = base64.b64encode(part.inline_data.data).decode("utf-8")
-            return {
-                "audio_url": f"data:{mime};base64,{data}",
-                "lyrics": lyrics,
-                "prompt_used": lyria_prompt[:200],
-                "voice_type": voice_type,
-            }
-
+            return f"data:{mime};base64,{data}"
     raise RuntimeError("Lyria returned no audio")
+
+
+def generate_song(idea: str, voice_type: str = "default", instruments: list = None) -> dict:
+    """Lyria instrumental + Gemini TTS vocals in the speaker's voice type."""
+    import concurrent.futures
+    lyrics, style = make_song_lyrics(idea)
+    voice_name = TTS_VOICES.get(voice_type, TTS_VOICES["default"])
+
+    instrument_str = f"featuring {', '.join(instruments)}. " if instruments else ""
+    lyria_prompt = (
+        f"{style}. {instrument_str}"
+        "INSTRUMENTAL ONLY. NO vocals. NO singing. Pure music track for children."
+    )
+    print(f"[song] voice={voice_type}→{voice_name} instruments={instruments}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        lyria_f = ex.submit(_lyria_instrumental, lyria_prompt)
+        tts_f   = ex.submit(_gemini_tts_vocals, lyrics, voice_name)
+        instrumental_url = lyria_f.result()
+        vocals_url       = tts_f.result()
+
+    return {
+        "audio_url":        vocals_url,
+        "instrumental_url": instrumental_url,
+        "lyrics":           lyrics,
+        "prompt_used":      lyria_prompt[:200],
+        "voice_type":       voice_type,
+        "voice_name":       voice_name,
+    }
 
 
 def _extract_mime_and_bytes(data_url: str):

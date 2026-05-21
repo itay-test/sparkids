@@ -374,6 +374,7 @@ export default function App() {
         {isDone && song && (
           <SongPlayer
             audioUrl={song.audio_url}
+            instrumentalUrl={song.instrumental_url}
             lyrics={song.lyrics}
             hasClonedVoice={hasClonedVoice}
             onReset={reset}

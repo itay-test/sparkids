@@ -1,34 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, RotateCcw, Sparkles, Music2, Mic } from "lucide-react";
 
-export default function SongPlayer({ audioUrl, lyrics, hasClonedVoice, onReset, onCloneVoice }) {
-  const audioRef  = useRef(null);
+export default function SongPlayer({ audioUrl, instrumentalUrl, lyrics, hasClonedVoice, onReset, onCloneVoice }) {
+  const vocalsRef       = useRef(null);
+  const instrumentalRef = useRef(null);
+  const audioRef        = vocalsRef; // alias for existing code
   const [playing, setPlaying]   = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {
-    // auto-play when loaded
-    const a = audioRef.current;
+    const a = vocalsRef.current;
+    const b = instrumentalRef.current;
     if (!a) return;
+    if (b) { b.volume = 0.35; b.loop = true; }
     a.onloadedmetadata = () => setDuration(a.duration);
     a.ontimeupdate    = () => setProgress(a.currentTime / (a.duration || 1));
-    a.onended         = () => setPlaying(false);
-    a.play().then(() => setPlaying(true)).catch(() => {});
+    a.onended         = () => { setPlaying(false); b?.pause(); };
+    a.play().then(() => { setPlaying(true); b?.play(); }).catch(() => {});
   }, [audioUrl]);
 
   function toggle() {
-    const a = audioRef.current;
+    const a = vocalsRef.current;
+    const b = instrumentalRef.current;
     if (!a) return;
-    if (playing) { a.pause(); setPlaying(false); }
-    else         { a.play();  setPlaying(true);  }
+    if (playing) { a.pause(); b?.pause(); setPlaying(false); }
+    else         { a.play();  b?.play();  setPlaying(true);  }
   }
 
   function restart() {
-    const a = audioRef.current;
+    const a = vocalsRef.current;
+    const b = instrumentalRef.current;
     if (!a) return;
-    a.currentTime = 0;
-    a.play(); setPlaying(true);
+    a.currentTime = 0; if (b) b.currentTime = 0;
+    a.play(); b?.play(); setPlaying(true);
   }
 
   const mins = Math.floor(duration / 60);
@@ -115,7 +120,8 @@ export default function SongPlayer({ audioUrl, lyrics, hasClonedVoice, onReset, 
         </button>
       </div>
 
-      <audio ref={audioRef} src={audioUrl} preload="auto"/>
+      <audio ref={vocalsRef} src={audioUrl} preload="auto"/>
+      {instrumentalUrl && <audio ref={instrumentalRef} src={instrumentalUrl} preload="auto" loop/>}
     </div>
   );
 }
