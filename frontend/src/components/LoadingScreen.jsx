@@ -10,6 +10,15 @@ const PAINT_MSGS = [
   { icon: "🦋", text: "הפרפר מצייר בכנפיים..." },
 ];
 
+const STORY_MSGS = [
+  { icon: "📖", text: "כותבת את הסיפור..." },
+  { icon: "✍️", text: "מוסיפה פרטים מצחיקים..." },
+  { icon: "🎭", text: "הדמות מתחממת לסיפור..." },
+  { icon: "🌙", text: "מכינה סיפור שינה מושלם..." },
+  { icon: "⭐", text: "מוסיפה קצת קסם..." },
+  { icon: "🎤", text: "מכינה את הקול..." },
+];
+
 const SONG_MSGS = [
   { icon: "🎵", text: "כותבת את מילות השיר..." },
   { icon: "🎶", text: "מלחינה מנגינה..." },
@@ -20,7 +29,7 @@ const SONG_MSGS = [
 ];
 
 export default function LoadingScreen({ mode }) {
-  const msgs = mode === "song" ? SONG_MSGS : PAINT_MSGS;
+  const msgs = mode === "song" ? SONG_MSGS : mode === "story" ? STORY_MSGS : PAINT_MSGS;
   const [idx, setIdx] = useState(Math.floor(Math.random() * msgs.length));
 
   useEffect(() => {
@@ -37,7 +46,7 @@ export default function LoadingScreen({ mode }) {
       <div>
         <p className="text-2xl font-black text-purple-700">{text}</p>
         <p className="text-gray-400 mt-1 font-medium text-sm flex items-center justify-center gap-1">
-          {mode === "song" ? "יוצרת שיר" : "יוצרת ציור"}
+          {mode === "song" ? "יוצרת שיר" : mode === "story" ? "יוצרת סיפור" : "יוצרת ציור"}
           <Sparkles size={14} className="text-purple-300"/>
         </p>
       </div>

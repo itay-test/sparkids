@@ -7,8 +7,10 @@ import LoadingScreen from "./components/LoadingScreen";
 import SongPlayer from "./components/SongPlayer";
 import VoiceClone from "./components/VoiceClone";
 import InstrumentPicker from "./components/InstrumentPicker";
+import CharacterPicker from "./components/CharacterPicker";
+import StoryPlayer from "./components/StoryPlayer";
 import Logo from "./components/Logo";
-import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star, Music2 } from "lucide-react";
+import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star, Music2, BookOpen } from "lucide-react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -38,6 +40,9 @@ export default function App() {
   const [voiceChecked, setVoiceChecked] = useState(false);
   const [instruments, setInstruments] = useState(null); // null=not chosen, []=any
   const [songStep, setSongStep]   = useState("mode"); // mode|instruments|mic
+  const [storyChar, setStoryChar] = useState(null);
+  const [storyStep, setStoryStep] = useState("mode"); // mode|character|mic
+  const [storyData, setStoryData] = useState(null);
   const abortRef                  = useRef(null);
   const [shareData, setShareData] = useState(null);
   const [mode, setMode]           = useState(null);   // null = not chosen yet
@@ -50,7 +55,12 @@ export default function App() {
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      if (mode === "song") {
+      if (mode === "story") {
+        const { data } = await axios.post(`${API}/story/`,
+          { idea: text, kid_name: "Carmel", character_id: storyChar },
+          { signal: controller.signal });
+        setStoryData(data);
+      } else if (mode === "song") {
         const { data } = await axios.post(`${API}/song/`,
           { idea: text, kid_name: "Carmel", voice_audio_b64: audioB64, instruments: instruments || [] },
           { signal: controller.signal });
@@ -95,6 +105,7 @@ export default function App() {
     setStatus("idle"); setTranscript(""); setResult(null);
     setSong(null); setShareData(null); setPhoto(null);
     setMode(null); setInstruments(null); setSongStep("mode");
+    setStoryChar(null); setStoryStep("mode"); setStoryData(null);
   }
 
   async function handleShare() {
@@ -181,6 +192,19 @@ export default function App() {
                 <span className="text-purple-300 font-bold text-xs text-center">צלמי תמונה<br/>ואני אקשט אותה</span>
               </button>
             </div>
+            {/* Story mode */}
+            <button onClick={() => { setMode("story"); setStoryStep("character"); }}
+              className="card w-full py-6 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-indigo-200">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg shrink-0"
+                style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6,#ec4899)"}}>
+                <BookOpen size={30} color="white" strokeWidth={1.5}/>
+              </div>
+              <div className="text-right">
+                <p className="text-purple-700 font-black text-xl">סיפור לפני שינה</p>
+                <p className="text-purple-300 font-bold text-sm">תגידי על מה הסיפור<br/>ובחרי מי יספר</p>
+              </div>
+            </button>
+
             {/* Song mode — full width */}
             <button onClick={selectSongMode}
               className="card w-full py-6 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
@@ -199,6 +223,14 @@ export default function App() {
         {/* Step 2 — photo upload */}
         {mode === "photo" && isIdle && <PhotoInput onPhoto={setPhoto} />}
 
+        {/* Story: character picker */}
+        {mode === "story" && isIdle && storyStep === "character" && (
+          <CharacterPicker
+            onSelect={(id) => { setStoryChar(id); setStoryStep("mic"); }}
+            onBack={() => { setMode(null); setStoryStep("mode"); }}
+          />
+        )}
+
         {/* Step 2 — instrument picker (song mode) */}
         {mode === "song" && isIdle && songStep === "instruments" && (
           <InstrumentPicker
@@ -208,11 +240,13 @@ export default function App() {
         )}
 
         {/* Step 2/3 — mic screen */}
-        {mode && !isDone && !isLoading && (mode !== "song" || songStep === "mic") && (
+        {mode && !isDone && !isLoading &&
+         (mode !== "song"  || songStep  === "mic") &&
+         (mode !== "story" || storyStep === "mic") && (
           <div className="flex flex-col items-center gap-6 animate-pop">
 
             {/* Big instruction card */}
-            {isIdle && !transcript && songStep !== "instruments" && (
+            {isIdle && !transcript && songStep !== "instruments" && storyStep !== "character" && (
               <div className="card w-full px-6 py-6 text-center border-2 border-purple-100">
                 <div className="flex justify-center mb-3">
                   {mode === "photo" && !photo ? <ImagePlus size={44} className="text-pink-400" strokeWidth={1.5}/>
@@ -221,11 +255,14 @@ export default function App() {
                 </div>
                 <p className="text-2xl font-black text-purple-800">
                   {mode === "photo" && !photo ? "בחרי תמונה"
-                    : mode === "song" ? "על מה השיר?"
+                    : mode === "song"  ? "על מה השיר?"
+                    : mode === "story" ? "על מה הסיפור?"
                     : "דברי מה תרצי!"}
                 </p>
                 <p className="text-purple-300 font-bold text-sm mt-1">
-                  {mode === "song" ? "השיר יושר בקולך!" : "כלב ורוד • חד קרן • נסיכה"}
+                  {mode === "song"  ? "השיר יושר בקולך!"
+                  : mode === "story" ? "נסיכה • חללית • כלב קטן"
+                  : "כלב ורוד • חד קרן • נסיכה"}
                 </p>
               </div>
             )}
@@ -276,6 +313,16 @@ export default function App() {
             onShare={handleShare}
             onReset={reset}
             onImproved={(data) => setResult(data)}
+          />
+        )}
+
+        {/* Story result */}
+        {isDone && storyData && (
+          <StoryPlayer
+            storyText={storyData.story_text}
+            audioUrl={storyData.audio_url}
+            characterId={storyData.character_id}
+            onReset={reset}
           />
         )}
 
