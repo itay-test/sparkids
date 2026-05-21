@@ -73,16 +73,20 @@ def make_song_lyrics(idea: str) -> tuple:
     return lyrics, style
 
 
-def generate_song(idea: str, voice_type: str = "default") -> dict:
+def generate_song(idea: str, voice_type: str = "default", instruments: list = None) -> dict:
     """Generate a children's song with Lyria. voice_type affects the vocal style."""
     lyrics, style = make_song_lyrics(idea)
     voice_style = VOICE_STYLES.get(voice_type, VOICE_STYLES["default"])
 
+    instrument_str = ""
+    if instruments:
+        instrument_str = f"featuring {', '.join(instruments)}. "
+
     lyria_prompt = (
-        f"{style}, {voice_style}. "
+        f"{style}. {instrument_str}{voice_style}. "
         f"Hebrew children's song. Vocals singing these lyrics: {lyrics}"
     )
-    print(f"[song] voice_type={voice_type} | style={style[:50]}")
+    print(f"[song] voice={voice_type} instruments={instruments} | style={style[:40]}")
 
     response = _gemini.models.generate_content(
         model=MUSIC_MODEL,

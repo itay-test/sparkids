@@ -12,6 +12,7 @@ class SongRequest(BaseModel):
     idea: str
     kid_name: str
     voice_audio_b64: Optional[str] = None
+    instruments: list = []
 
 
 @router.post("/")
@@ -21,7 +22,7 @@ def create_song(req: SongRequest):
         try:
             audio_bytes = base64.b64decode(req.voice_audio_b64)
             voice_type = analyze_voice(audio_bytes)
-            print(f"[song] detected voice_type={voice_type}")
+            print(f"[song] voice_type={voice_type}")
         except Exception as e:
             print(f"[song] voice analysis failed: {e}")
-    return generate_song(req.idea, voice_type=voice_type)
+    return generate_song(req.idea, voice_type=voice_type, instruments=req.instruments)

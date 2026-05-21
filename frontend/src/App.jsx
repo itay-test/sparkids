@@ -6,6 +6,7 @@ import PhotoInput from "./components/PhotoInput";
 import LoadingScreen from "./components/LoadingScreen";
 import SongPlayer from "./components/SongPlayer";
 import VoiceClone from "./components/VoiceClone";
+import InstrumentPicker from "./components/InstrumentPicker";
 import Logo from "./components/Logo";
 import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star, Music2 } from "lucide-react";
 import axios from "axios";
@@ -35,6 +36,8 @@ export default function App() {
   const [showClone, setShowClone] = useState(false);
   const [hasClonedVoice, setHasClonedVoice] = useState(false);
   const [voiceChecked, setVoiceChecked] = useState(false);
+  const [instruments, setInstruments] = useState(null); // null=not chosen, []=any
+  const [songStep, setSongStep]   = useState("mode"); // mode|instruments|mic
   const abortRef                  = useRef(null);
   const [shareData, setShareData] = useState(null);
   const [mode, setMode]           = useState(null);   // null = not chosen yet
@@ -49,7 +52,7 @@ export default function App() {
     try {
       if (mode === "song") {
         const { data } = await axios.post(`${API}/song/`,
-          { idea: text, kid_name: "Carmel", voice_audio_b64: audioB64 },
+          { idea: text, kid_name: "Carmel", voice_audio_b64: audioB64, instruments: instruments || [] },
           { signal: controller.signal });
         setSong(data);
         setHasClonedVoice(true);
@@ -84,12 +87,14 @@ export default function App() {
   }
 
   function selectSongMode() {
-    setMode("song"); // voice is captured automatically during mic recording
+    setMode("song");
+    setSongStep("instruments");
   }
 
   function reset() {
     setStatus("idle"); setTranscript(""); setResult(null);
-    setSong(null); setShareData(null); setPhoto(null); setMode(null);
+    setSong(null); setShareData(null); setPhoto(null);
+    setMode(null); setInstruments(null); setSongStep("mode");
   }
 
   async function handleShare() {
@@ -194,12 +199,20 @@ export default function App() {
         {/* Step 2 — photo upload */}
         {mode === "photo" && isIdle && <PhotoInput onPhoto={setPhoto} />}
 
+        {/* Step 2 — instrument picker (song mode) */}
+        {mode === "song" && isIdle && songStep === "instruments" && (
+          <InstrumentPicker
+            onConfirm={(chosen) => { setInstruments(chosen); setSongStep("mic"); }}
+            onBack={() => { setMode(null); setSongStep("mode"); }}
+          />
+        )}
+
         {/* Step 2/3 — mic screen */}
-        {mode && !isDone && !isLoading && (
+        {mode && !isDone && !isLoading && (mode !== "song" || songStep === "mic") && (
           <div className="flex flex-col items-center gap-6 animate-pop">
 
             {/* Big instruction card */}
-            {isIdle && !transcript && (
+            {isIdle && !transcript && songStep !== "instruments" && (
               <div className="card w-full px-6 py-6 text-center border-2 border-purple-100">
                 <div className="flex justify-center mb-3">
                   {mode === "photo" && !photo ? <ImagePlus size={44} className="text-pink-400" strokeWidth={1.5}/>
@@ -236,7 +249,7 @@ export default function App() {
             />
 
             {/* Bouncing finger — points at mic */}
-            {isIdle && !transcript && (mode === "voice" || mode === "song") && (
+            {isIdle && !transcript && (mode === "voice" || (mode === "song" && songStep === "mic")) && (
               <div className="text-3xl animate-bounce -mt-2 opacity-50">👆</div>
             )}
 
