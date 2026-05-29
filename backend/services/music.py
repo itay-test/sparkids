@@ -8,71 +8,34 @@ load_dotenv()
 _gemini = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
 TEXT_MODEL  = "gemini-2.5-flash"
-IMAGE_MODEL = "gemini-2.5-flash-image"
 MUSIC_MODEL = "lyria-3-pro-preview"
 
-VOICE_STYLES = {
-    "man":    "sung by a warm adult male voice",
-    "woman":  "sung by a warm adult female voice",
-    "girl":   "sung by a bright young girl's voice",
-    "boy":    "sung by an energetic young boy's voice",
-    "default":"sung by a friendly warm voice",
-}
 
-# Gemini TTS voice per detected type (for vocal track)
-TTS_VOICES = {
-    "man":    "Charon",
-    "woman":  "Kore",
-    "girl":   "Aoede",
-    "boy":    "Puck",
-    "default":"Zephyr",
-}
-
-
-def make_kid_prompt(idea: str, has_photo: bool = False) -> str:
-    context = "enhance the uploaded photo based on" if has_photo else "create a painting of"
-    response = _gemini.models.generate_content(
-        model=TEXT_MODEL,
-        contents=(
-            f"A 5-year-old Israeli girl named Carmel said (in Hebrew, baby talk, or broken words): '{idea}'. "
-            f"Understand what she means and write a prompt to {context} her idea (max 50 words). "
-            "IMPORTANT: Do NOT use copyrighted character names (no Disney, Marvel, etc.). "
-            "Describe characters by appearance instead. "
-            "Keep it magical, cute, and appropriate for young children. "
-            "Return only the image prompt in English, nothing else."
-        ),
-    )
-    return response.text.strip()
-
-
-def make_improve_prompt(feedback: str, previous_prompt: str) -> str:
-    response = _gemini.models.generate_content(
-        model=TEXT_MODEL,
-        contents=(
-            f"A 5-year-old Israeli girl wants to improve her painting (feedback in Hebrew or baby talk): '{feedback}'. "
-            f"The current painting shows: '{previous_prompt}'. "
-            "Write a SHORT image editing instruction (max 40 words). "
-            "Start with: 'Edit this image:' then describe ONLY what to add or change. Keep everything else the same. "
-            "Do NOT use copyrighted character names. "
-            "Return only the instruction in English, nothing else."
-        ),
-    )
-    return response.text.strip()
-
-
-def make_song_lyrics(idea: str) -> tuple:
+def make_song_lyrics(idea: str, preferences: str = "", companion_name: str = "", companion_likes: str = "") -> tuple:
     """Returns (lyrics_hebrew, music_style_english)."""
+    pref_line = f"\nChild's taste profile: {preferences}" if preferences else ""
+    companion_line = ""
+    if companion_name:
+        companion_line = f"\nThe child's companion character is called '{companion_name}'"
+        if companion_likes:
+            companion_line += f" and loves {companion_likes}"
+        companion_line += ". Include this character by name in the song."
     response = _gemini.models.generate_content(
         model=TEXT_MODEL,
         contents=(
-            f"A child wants a song about: '{idea}' (may be in Hebrew or baby talk). "
-            "Write a SHORT children's song:\n"
-            "LYRICS:\n<2 short verses + chorus in Hebrew, max 8 lines>\n\n"
-            "MUSIC STYLE: <upbeat/slow/etc, instruments, mood — in English, max 15 words>"
+            f"A child (age 3-5) wants a fun karaoke song about: '{idea}' (may be in Hebrew or baby talk).{pref_line}{companion_line}\n"
+            "Write a joyful, very singable Hebrew children's karaoke song with strong rhythm, clear rhymes, and short lines easy to sing along:\n\n"
+            "LYRICS:\n"
+            "<verse 1: 2 short rhyming lines>\n"
+            "<chorus: 2 very catchy rhyming lines — the HOOK kids will love>\n"
+            "<verse 2: 2 short rhyming lines>\n"
+            "<chorus again>\n"
+            "Max 8 lines total. Very simple words. Strong bouncy beat. Hebrew only. Each line max 6 words.\n\n"
+            "MUSIC STYLE: <detailed style — tempo (e.g. lively 120bpm), key (e.g. C major), specific instruments, mood — English, max 20 words>"
         ),
     )
     raw = response.text.strip()
-    lyrics, style = "", "upbeat happy children's pop, playful melody, major key"
+    lyrics, style = "", "upbeat happy children's pop, 120bpm, glockenspiel and ukulele, C major key, bouncy"
     if "LYRICS:" in raw and "MUSIC STYLE:" in raw:
         parts = raw.split("MUSIC STYLE:")
         lyrics = parts[0].replace("LYRICS:", "").strip()
@@ -82,38 +45,30 @@ def make_song_lyrics(idea: str) -> tuple:
     return lyrics, style
 
 
-def _pcm_to_wav(pcm: bytes, rate: int = 24000) -> bytes:
-    import struct
-    n = len(pcm)
-    hdr = struct.pack("<4sI4s4sIHHIIHH4sI",
-        b"RIFF", 36+n, b"WAVE", b"fmt ", 16,
-        1, 1, rate, rate*2, 2, 16, b"data", n)
-    return hdr + pcm
-
-
-def _gemini_tts_vocals(lyrics: str, voice_name: str) -> str:
-    """Sing lyrics with Gemini TTS in the matched voice. Returns base64 data URL."""
-    resp = _gemini.models.generate_content(
-        model="gemini-2.5-flash-preview-tts",
-        contents=f"Sing these Hebrew children's song lyrics expressively with rhythm:\n\n{lyrics}",
-        config=types.GenerateContentConfig(
-            response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice_name)
-                )
-            )
-        )
+def improve_song_lyrics(feedback: str, previous_lyrics: str, companion_name: str = "") -> tuple:
+    """Returns (improved_lyrics_hebrew, music_style_english)."""
+    companion_line = f" Keep the character '{companion_name}' in the lyrics." if companion_name else ""
+    response = _gemini.models.generate_content(
+        model=TEXT_MODEL,
+        contents=(
+            f"A child gave feedback on their karaoke song (in Hebrew or baby talk): '{feedback}'.{companion_line}\n"
+            f"Current song lyrics:\n{previous_lyrics}\n\n"
+            "Improve the lyrics based on the feedback. Keep same theme, apply the change. Keep lines short and singable.\n"
+            "LYRICS:\n<verse 1>\n<chorus>\n<verse 2>\n<chorus>\nMax 8 lines. Hebrew only. Each line max 6 words.\n\n"
+            "MUSIC STYLE: <tempo, instruments, mood — English, max 20 words>"
+        ),
     )
-    for part in resp.candidates[0].content.parts:
-        if part.inline_data is not None:
-            wav = _pcm_to_wav(part.inline_data.data)
-            return f"data:audio/wav;base64,{base64.b64encode(wav).decode()}"
-    raise RuntimeError("TTS returned no audio")
+    raw = response.text.strip()
+    lyrics, style = previous_lyrics, "upbeat happy children's pop, 120bpm, glockenspiel and ukulele, C major key, bouncy"
+    if "LYRICS:" in raw and "MUSIC STYLE:" in raw:
+        parts = raw.split("MUSIC STYLE:")
+        lyrics = parts[0].replace("LYRICS:", "").strip()
+        style  = parts[1].strip()
+    return lyrics, style
 
 
 def _lyria_instrumental(prompt: str) -> str:
-    """Generate instrumental track with Lyria. Returns base64 data URL."""
+    """Generate instrumental karaoke track with Lyria. Returns base64 data URL."""
     response = _gemini.models.generate_content(
         model=MUSIC_MODEL,
         contents=prompt,
@@ -130,72 +85,55 @@ def _lyria_instrumental(prompt: str) -> str:
     raise RuntimeError("Lyria returned no audio")
 
 
-def generate_song(idea: str, voice_type: str = "default", instruments: list = None) -> dict:
-    """Lyria instrumental + Gemini TTS vocals in the speaker's voice type."""
-    import concurrent.futures
-    lyrics, style = make_song_lyrics(idea)
-    voice_name = TTS_VOICES.get(voice_type, TTS_VOICES["default"])
-
-    instrument_str = f"featuring {', '.join(instruments)}. " if instruments else ""
-    lyria_prompt = (
-        f"{style}. {instrument_str}"
-        "INSTRUMENTAL ONLY. NO vocals. NO singing. Pure music track for children."
+def _build_lyria_prompt(style: str, lyrics: str, instruments: list = None) -> str:
+    instrument_str = f"Featuring: {', '.join(instruments)}. " if instruments else ""
+    return (
+        f"Children's karaoke backing track. {style}. {instrument_str}"
+        f"Instrumental backing for a Hebrew children's song with this lyrical mood and rhythm: {lyrics[:120]}. "
+        "INSTRUMENTAL ONLY — absolutely NO vocals, NO singing, NO humming, NO speech. "
+        "Strong clear beat so a child can sing along. Energetic, fun, loop-friendly. 45 seconds."
     )
-    print(f"[song] voice={voice_type}→{voice_name} instruments={instruments}")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
-        lyria_f = ex.submit(_lyria_instrumental, lyria_prompt)
-        tts_f   = ex.submit(_gemini_tts_vocals, lyrics, voice_name)
-        instrumental_url = lyria_f.result()
-        vocals_url       = tts_f.result()
+
+def generate_song(idea: str, voice_type: str = "default", instruments: list = None,
+                  preferences: str = "", companion_name: str = "", companion_likes: str = "") -> dict:
+    """Karaoke mode: Lyria instrumental only — kid sings along."""
+    lyrics, style = make_song_lyrics(idea, preferences=preferences,
+                                     companion_name=companion_name, companion_likes=companion_likes)
+    lyria_prompt = _build_lyria_prompt(style, lyrics, instruments)
+    print(f"[song/karaoke] style={style[:60]} companion={companion_name}")
+
+    instrumental_url = _lyria_instrumental(lyria_prompt)
 
     return {
-        "audio_url":        vocals_url,
+        "audio_url":        None,
         "instrumental_url": instrumental_url,
         "lyrics":           lyrics,
+        "style":            style,
+        "instruments":      instruments or [],
         "prompt_used":      lyria_prompt[:200],
         "voice_type":       voice_type,
-        "voice_name":       voice_name,
+        "karaoke":          True,
     }
 
 
-def _extract_mime_and_bytes(data_url: str):
-    if "," in data_url:
-        header, b64data = data_url.split(",", 1)
-        mime = header.split(":")[1].split(";")[0] if ":" in header else "image/jpeg"
-    else:
-        b64data = data_url
-        mime = "image/jpeg"
-    return mime, base64.b64decode(b64data)
+def improve_song(feedback: str, previous_lyrics: str, previous_style: str,
+                 voice_type: str = "default", instruments: list = None,
+                 companion_name: str = "") -> dict:
+    """Regenerate karaoke instrumental based on child's voice feedback."""
+    lyrics, style = improve_song_lyrics(feedback, previous_lyrics, companion_name=companion_name)
+    lyria_prompt = _build_lyria_prompt(style, lyrics, instruments)
+    print(f"[song/karaoke/improve] feedback={feedback[:40]}")
 
+    instrumental_url = _lyria_instrumental(lyria_prompt)
 
-def _call_image_model(contents) -> str:
-    response = _gemini.models.generate_content(
-        model=IMAGE_MODEL,
-        contents=contents,
-        config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
-    )
-    candidate = response.candidates[0]
-    if candidate.content is None:
-        raise RuntimeError(f"Image blocked: {candidate.finish_reason}")
-    for part in candidate.content.parts:
-        if part.inline_data is not None:
-            mime = part.inline_data.mime_type
-            data = base64.b64encode(part.inline_data.data).decode("utf-8")
-            return f"data:{mime};base64,{data}"
-    raise RuntimeError("Gemini returned no image")
-
-
-def generate_image(prompt: str) -> str:
-    print(f"[paint] prompt: {prompt[:80]}")
-    return _call_image_model(prompt)
-
-
-def generate_image_from_photo(prompt: str, photo_b64: str) -> str:
-    mime, photo_bytes = _extract_mime_and_bytes(photo_b64)
-    print(f"[paint] photo mime={mime} size={len(photo_bytes)}b")
-    contents = [
-        types.Part(inline_data=types.Blob(data=photo_bytes, mime_type=mime)),
-        types.Part(text=prompt),
-    ]
-    return _call_image_model(contents)
+    return {
+        "audio_url":        None,
+        "instrumental_url": instrumental_url,
+        "lyrics":           lyrics,
+        "style":            style,
+        "instruments":      instruments or [],
+        "prompt_used":      lyria_prompt[:200],
+        "voice_type":       voice_type,
+        "karaoke":          True,
+    }

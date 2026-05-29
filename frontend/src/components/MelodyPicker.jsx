@@ -41,8 +41,9 @@ export default function MelodyPicker({ onConfirm, onBack }) {
         {selected ? `עם מנגינת ${MOODS.find(m=>m.id===selected)?.label} ←` : "בלי מנגינה ←"}
       </button>
 
-      <button onClick={onBack} className="flex items-center justify-center gap-1 text-gray-400 font-bold text-sm">
-        <ChevronLeft size={16}/> חזרי
+      <button onClick={onBack}
+        className="card w-full py-4 flex items-center justify-center gap-2 text-purple-400 font-black text-lg active:scale-95 transition-all border-2 border-purple-100 hover:border-purple-300">
+        <ChevronLeft size={24}/> חזרי
       </button>
     </div>
   );

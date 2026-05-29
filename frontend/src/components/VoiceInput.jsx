@@ -99,20 +99,28 @@ export default function VoiceInput({ status, onTranscript, onListening, onCancel
 
       {isListening && (
         <button onClick={() => { recognitionRef.current?.abort(); recorderRef.current?.recorder?.stop(); recorderRef.current?.stream?.getTracks().forEach(t=>t.stop()); setInterim(""); interimRef.current = ""; onCancel(); }}
-          className="w-9 h-9 rounded-full bg-white shadow-md flex items-center justify-center text-gray-400 hover:text-red-400 transition-all">
-          <X size={15}/>
+          className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-400 hover:text-red-400 active:scale-95 transition-all">
+          <X size={28}/>
         </button>
       )}
 
       {!isBusy && !isListening && disabled && (
-        <p className="font-bold text-base text-center text-gray-300">בחרי תמונה קודם</p>
+        <p className="text-4xl text-center">📸👆</p>
       )}
       {isListening && interim && (
         <div className="card px-5 py-3 text-center max-w-xs animate-pop">
           <p className="text-lg font-bold text-purple-700">{interim}</p>
         </div>
       )}
-      {error && <p className="text-red-400 font-semibold text-sm">{error}</p>}
+      {isListening && !interim && (
+        <p className="text-3xl animate-pulse">🎤</p>
+      )}
+      {error && (
+        <div className="card px-6 py-4 text-center border-2 border-yellow-100 animate-pop">
+          <p className="text-4xl mb-1">😅</p>
+          <p className="text-xl font-black text-purple-700">נסי שוב!</p>
+        </div>
+      )}
     </div>
   );
 }

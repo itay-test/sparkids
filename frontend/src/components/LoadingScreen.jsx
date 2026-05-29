@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Sparkles, Music2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
+import BubblePopper from "./BubblePopper";
 
 const PAINT_MSGS = [
   { icon: "🦄", text: "החד-קרן מכין את הצבעים..." },
@@ -32,7 +33,7 @@ const SONG_MSGS = [
 
 export default function LoadingScreen({ mode }) {
   const msgs = mode === "song" ? SONG_MSGS : mode === "story" ? STORY_MSGS : PAINT_MSGS;
-  const [idx, setIdx] = useState(Math.floor(Math.random() * msgs.length));
+  const [idx, setIdx] = useState(0);
 
   useEffect(() => {
     setIdx(0);
@@ -43,7 +44,8 @@ export default function LoadingScreen({ mode }) {
   const { icon, text } = msgs[idx];
 
   return (
-    <div className="card py-12 flex flex-col items-center gap-6 animate-pop text-center">
+    <div className="card py-8 flex flex-col items-center gap-5 animate-pop text-center">
+      {/* Main animated emoji */}
       <div className="text-8xl animate-float">{icon}</div>
       <div>
         <p className="text-2xl font-black text-purple-700">{text}</p>
@@ -52,6 +54,11 @@ export default function LoadingScreen({ mode }) {
           <Sparkles size={14} className="text-purple-300"/>
         </p>
       </div>
+
+      {/* Tappable bubbles — keep kids busy */}
+      <BubblePopper />
+
+      {/* Bouncing dots */}
       <div className="flex gap-2">
         {[0,1,2].map(i => (
           <div key={i} className="w-3 h-3 rounded-full bg-purple-400 animate-bounce"

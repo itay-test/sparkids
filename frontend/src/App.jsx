@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import VoiceInput from "./components/VoiceInput";
 import ImageDisplay from "./components/ImageDisplay";
 import ShareModal from "./components/ShareModal";
@@ -6,12 +6,18 @@ import PhotoInput from "./components/PhotoInput";
 import LoadingScreen from "./components/LoadingScreen";
 import SongPlayer from "./components/SongPlayer";
 import VoiceClone from "./components/VoiceClone";
-import InstrumentPicker from "./components/InstrumentPicker";
 import CharacterPicker from "./components/CharacterPicker";
-import MelodyPicker from "./components/MelodyPicker";
 import StoryPlayer from "./components/StoryPlayer";
+import UserSwitcher from "./components/UserSwitcher";
+import GalleryRow from "./components/GalleryRow";
+import CompanionCreator from "./components/CompanionCreator";
+import CompanionAvatar from "./components/CompanionAvatar";
 import Logo from "./components/Logo";
-import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Crown, Star, Music2, BookOpen } from "lucide-react";
+import { USERS } from "./config/users";
+import { useGallery } from "./hooks/useGallery";
+import { usePreferences } from "./hooks/usePreferences";
+import { useCompanion } from "./hooks/useCompanion";
+import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Music2, BookOpen, Stars } from "lucide-react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -32,58 +38,103 @@ const BG_DECO = [
 ];
 
 export default function App() {
-  const [status, setStatus]       = useState("idle");
-  const [transcript, setTranscript] = useState("");
-  const [result, setResult]       = useState(null);
-  const [song, setSong]           = useState(null);
-  const [showClone, setShowClone] = useState(false);
-  const [hasClonedVoice, setHasClonedVoice] = useState(false);
-  const [voiceChecked, setVoiceChecked] = useState(false);
-  const [instruments, setInstruments] = useState(null); // null=not chosen, []=any
-  const [songStep, setSongStep]   = useState("mode"); // mode|instruments|mic
-  const [storyChar, setStoryChar]     = useState(null);
-  const [storyMood, setStoryMood]     = useState(null);
-  const [storyVideo, setStoryVideo]   = useState(false);
-  const [storyStep, setStoryStep]     = useState("mode"); // mode|character|melody|mic
-  const [storyData, setStoryData]     = useState(null);
-  const abortRef                  = useRef(null);
-  const [shareData, setShareData] = useState(null);
-  const [mode, setMode]           = useState(null);   // null = not chosen yet
-  const [photo, setPhoto]         = useState(null);
+  // ── Active user ──────────────────────────────────────────
+  const [activeUserId, setActiveUserId] = useState("carmel");
+  const activeUser = USERS.find(u => u.id === activeUserId) || USERS[3];
+  const gallery    = useGallery(activeUserId);
+  const { prefs, addLike, dismissCelebration, prefString } = usePreferences(activeUserId);
+  const { companion, save: saveCompanion, companionString } = useCompanion(activeUserId);
 
+  // ── Creation celebration (fires on done) ─────────────────
+  const [showCreationCelebration, setShowCreationCelebration] = useState(false);
+
+  useEffect(() => {
+    if (!prefs.showCelebration) return;
+    const t = setTimeout(dismissCelebration, 2500);
+    return () => clearTimeout(t);
+  }, [prefs.showCelebration]);
+
+  // ── Core state ────────────────────────────────────────────
+  const [status, setStatus]         = useState("idle");
+  const [transcript, setTranscript] = useState("");
+  const [result, setResult]         = useState(null);
+  const [song, setSong]             = useState(null);
+  const [storyData, setStoryData]   = useState(null);
+  const [showClone, setShowClone]   = useState(false);
+  const [hasClonedVoice, setHasClonedVoice] = useState(false);
+  const [mode, setMode]             = useState(null);
+  const [photo, setPhoto]           = useState(null);
+  const [storyChar, setStoryChar]   = useState(null);
+  const [storyStep, setStoryStep]   = useState("character");
+  const [shareData, setShareData]   = useState(null);
+  const [galleryItem, setGalleryItem] = useState(null);
+  const abortRef = useRef(null);
+
+  const isIdle      = status === "idle";
+  const isLoading   = status === "loading";
+  const isListening = status === "listening";
+  const isDone      = status === "done";
+
+  const canGoBack = mode !== null || photo || status !== "idle" || result || song || storyData;
+
+  // ── Creation handlers ─────────────────────────────────────
   async function handleTranscript(text, audioB64 = null) {
     if (!text) { setStatus("idle"); return; }
     setTranscript(text);
     setStatus("loading");
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // Build companion payload
+    const companionPayload = companion
+      ? { companion_name: companion.name, companion_likes: companion.likes?.join(", ") || "" }
+      : {};
+
     try {
       if (mode === "story") {
         const { data } = await axios.post(`${API}/story/`,
-          { idea: text, kid_name: "Carmel", character_id: storyChar,
-            melody_mood: storyMood, include_video: storyVideo },
+          { idea: text, kid_name: activeUser.name,
+            character_id: storyChar,
+            melody_mood: "magic",
+            include_video: false,
+            preferences: prefString,
+            ...companionPayload },
           { signal: controller.signal });
         setStoryData(data);
+        gallery.save({ type: "story", characterId: storyChar, transcript: text });
+        addLike(text);
       } else if (mode === "song") {
         const { data } = await axios.post(`${API}/song/`,
-          { idea: text, kid_name: "Carmel", voice_audio_b64: audioB64, instruments: instruments || [] },
+          { idea: text, kid_name: activeUser.name,
+            voice_audio_b64: audioB64,
+            instruments: [],
+            preferences: prefString,
+            ...companionPayload },
           { signal: controller.signal });
         setSong(data);
         setHasClonedVoice(true);
+        gallery.save({ type: "song", transcript: text });
+        addLike(text);
       } else {
-        const payload = { idea: text, kid_name: "Carmel" };
+        const payload = { idea: text, kid_name: activeUser.name,
+          preferences: prefString,
+          companion_name: companion?.name || "",
+          companion_desc: companion?.companionType || "" };
         if (photo) payload.photo = photo;
         const { data } = await axios.post(`${API}/paint/`, payload,
           { signal: controller.signal });
         setResult(data);
+        gallery.save({ type: "image", imageUrl: data.image_url, transcript: text });
+        addLike(text);
       }
       setStatus("done");
+      // Celebrate with kid's name
+      setShowCreationCelebration(true);
+      setTimeout(() => setShowCreationCelebration(false), 3000);
     } catch (e) {
       if (axios.isCancel(e)) { setStatus("idle"); setTranscript(""); }
       else setStatus("idle");
-    } finally {
-      abortRef.current = null;
-    }
+    } finally { abortRef.current = null; }
   }
 
   function cancelLoading() {
@@ -92,47 +143,46 @@ export default function App() {
     setTranscript("");
   }
 
-  // go back one level
   function goBack() {
-    if (status === "done")      { setResult(null); setTranscript(""); setStatus("idle"); return; }
-    if (status === "listening") { setStatus("idle"); return; }
-    if (photo)                  { setPhoto(null); return; }
-    if (mode)                   { setMode(null);  return; }
-  }
-
-  function selectSongMode() {
-    setMode("song");
-    setSongStep("instruments");
+    if (status === "done")       { setResult(null); setSong(null); setStoryData(null); setTranscript(""); setStatus("idle"); return; }
+    if (status === "listening")  { setStatus("idle"); return; }
+    if (photo)                   { setPhoto(null); return; }
+    if (mode === "story" && storyStep === "mic") { setStoryStep("character"); return; }
+    if (mode)                    { setMode(null); return; }
   }
 
   function reset() {
     setStatus("idle"); setTranscript(""); setResult(null);
     setSong(null); setShareData(null); setPhoto(null);
-    setMode(null); setInstruments(null); setSongStep("mode");
-    setStoryChar(null); setStoryMood(null); setStoryVideo(false);
-    setStoryStep("mode"); setStoryData(null);
+    setMode(null); setStoryChar(null);
+    setStoryStep("character"); setStoryData(null);
+    setShowCreationCelebration(false);
   }
 
   async function handleShare() {
     if (!result) return;
     const { data } = await axios.post(`${API}/share/`, {
-      kid_name: "Carmel", image_url: result.image_url, prompt_used: result.prompt_used,
+      kid_name: activeUser.name, image_url: result.image_url, prompt_used: result.prompt_used,
     });
     setShareData(data);
   }
 
-  const isIdle      = status === "idle";
-  const isLoading   = status === "loading";
-  const isListening = status === "listening";
-  const isDone      = status === "done";
+  async function handleShareNative(text, title = "Sparkids") {
+    if (navigator.share) {
+      try { await navigator.share({ title, text }); } catch {}
+    } else {
+      try { await navigator.clipboard.writeText(text); } catch {}
+    }
+  }
 
-  // show back arrow whenever there's something to go back to
-  const canGoBack = mode !== null || photo || status !== "idle" || result;
+  function switchUser(id) { reset(); setActiveUserId(id); }
+  function openGalleryItem(item) { setGalleryItem(item); }
 
+  // ── Render ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col items-center pb-16 relative overflow-hidden" dir="rtl">
+    <div className="min-h-screen flex flex-col items-center pb-20 relative overflow-hidden" dir="rtl">
 
-      {/* Animated background */}
+      {/* Background decoration */}
       {BG_DECO.map((d, i) => (
         <span key={i} className="fixed select-none pointer-events-none deco"
           style={{ top:`${d.top}%`, left:`${d.left}%`, fontSize:`${d.size}rem`,
@@ -141,182 +191,203 @@ export default function App() {
         </span>
       ))}
 
-      {/* Header */}
-      <div className="w-full bg-white/70 backdrop-blur-sm shadow-sm px-5 py-3 flex items-center justify-between mb-6 sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <Logo size={40}/>
-          <span className="text-xl font-black bg-clip-text text-transparent"
-            style={{backgroundImage:"linear-gradient(90deg,#7c3aed,#ec4899)"}}>
-            Sparkids
-          </span>
+      {/* ── Header ────────────────────────────────────────── */}
+      <div className="w-full bg-white/70 backdrop-blur-sm shadow-sm px-4 sticky top-0 z-10"
+        style={{ paddingTop: 10, paddingBottom: 18 }}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Logo size={36}/>
+            <span className="text-lg font-black bg-clip-text text-transparent"
+              style={{ backgroundImage:"linear-gradient(90deg,#7c3aed,#ec4899)" }}>
+              Sparkids
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {canGoBack && !isLoading && (
+              <button onClick={goBack}
+                className="w-14 h-14 rounded-full bg-purple-100 shadow flex items-center justify-center text-purple-500 hover:bg-purple-200 active:scale-95 transition-all">
+                <ArrowLeft size={26}/>
+              </button>
+            )}
+            {canGoBack && (
+              <button onClick={reset}
+                className="w-14 h-14 rounded-full bg-white shadow flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 active:scale-95 transition-all">
+                <X size={22}/>
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Back — one level */}
-          {canGoBack && !isLoading && (
-            <button onClick={goBack}
-              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-purple-400 hover:text-purple-700 hover:shadow-md transition-all">
-              <ArrowLeft size={18}/>
-            </button>
-          )}
-          {canGoBack && (
-            <button onClick={reset}
-              className="w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-300 hover:text-red-400 hover:shadow-md transition-all">
-              <X size={15}/>
-            </button>
-          )}
-          <span className="text-lg font-black text-purple-700 flex items-center gap-1">
-            כרמל <Crown size={18} className="text-yellow-400" fill="#facc15"/>
-          </span>
-        </div>
+        <UserSwitcher activeId={activeUserId} onChange={switchUser}/>
       </div>
 
-      <div className="w-full max-w-md px-4 flex flex-col gap-5 relative z-10">
+      {/* ── Toasts ────────────────────────────────────────── */}
+      {prefs.showCelebration && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-pop" onClick={dismissCelebration}>
+          <div className="bg-white rounded-3xl shadow-2xl px-7 py-4 flex items-center gap-3 border-2 border-purple-100">
+            <span className="text-3xl animate-bounce">✨</span>
+            <span className="text-purple-700 font-black text-xl">זכרתי!</span>
+            <span className="text-3xl animate-bounce" style={{ animationDelay:"0.15s" }}>🌟</span>
+          </div>
+        </div>
+      )}
 
-        {/* Step 1 — choose mode */}
-        {!mode && (
-          <div className="flex flex-col items-center gap-6 animate-pop">
+      {showCreationCelebration && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-pop">
+          <div className="bg-white rounded-3xl shadow-2xl px-7 py-4 flex items-center gap-3 border-2 border-pink-100">
+            <span className="text-3xl animate-bounce">🎉</span>
+            <span className="text-purple-700 font-black text-xl">כל הכבוד {activeUser.name}!</span>
+            <span className="text-3xl animate-bounce" style={{ animationDelay:"0.15s" }}>⭐</span>
+          </div>
+        </div>
+      )}
+
+      <div className="w-full max-w-md px-4 flex flex-col gap-5 relative z-10 mt-8">
+
+        {/* ── Home: mode selector ────────────────────────── */}
+        {!mode && !galleryItem && (
+          <div className="flex flex-col items-center gap-5 animate-pop">
+
             <div className="text-center">
-              <Star size={52} className="text-yellow-400 mx-auto mb-2" fill="#facc15" strokeWidth={1}/>
-              <p className="text-3xl font-black text-purple-800 leading-tight">היי כרמל!<br/>מה נצייר היום?</p>
+              <p className="text-4xl font-black text-purple-800 leading-tight">
+                היי {activeUser.name}! 👋
+              </p>
+              <p className="text-purple-400 font-bold text-lg mt-1">מה נעשה היום?</p>
             </div>
+
+            {/* Companion banner — if no companion, invite to create */}
+            {!companion ? (
+              <button onClick={() => setMode("companion")}
+                className="w-full card py-5 px-5 flex items-center gap-4 hover:shadow-xl transition-all active:scale-95 border-2 border-dashed border-purple-300 hover:border-purple-400">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background:"linear-gradient(135deg,#f9a8d4,#c084fc)" }}>
+                  <span className="text-3xl">✨</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-purple-700 font-black text-lg">צור/י את הדמות שלך!</p>
+                  <p className="text-purple-400 font-bold text-sm">הדמות תופיע בכל היצירות שלך</p>
+                </div>
+              </button>
+            ) : (
+              <button onClick={() => setMode("companion")}
+                className="w-full card py-4 px-5 flex items-center gap-4 hover:shadow-xl transition-all active:scale-95 border-2 border-purple-200">
+                <div className="w-14 h-14 rounded-full overflow-hidden border-3 border-purple-300 shrink-0"
+                  style={{ borderWidth: 3 }}>
+                  {companion.imageUrl
+                    ? <img src={companion.imageUrl} alt={companion.name} className="w-full h-full object-cover"/>
+                    : <div className="w-full h-full flex items-center justify-center text-2xl bg-purple-100">✨</div>
+                  }
+                </div>
+                <div className="text-right flex-1">
+                  <p className="text-purple-700 font-black text-lg">{companion.name} 🌟</p>
+                  {companion.likes?.length > 0 && (
+                    <p className="text-purple-400 font-bold text-sm">אוהב/ת: {companion.likes.slice(0,2).join(", ")}</p>
+                  )}
+                </div>
+                <span className="text-purple-300 text-sm font-bold">שנה/י</span>
+              </button>
+            )}
+
+            {/* Creation modes */}
             <div className="grid grid-cols-2 gap-4 w-full">
               <button onClick={() => setMode("voice")}
-                className="card py-8 px-4 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-purple-200">
-                <div className="w-20 h-20 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
-                  <Mic size={40} color="white" strokeWidth={1.5}/>
+                className="card py-10 px-4 flex flex-col items-center gap-4 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-purple-200">
+                <div className="w-24 h-24 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
+                  <Mic size={48} color="white" strokeWidth={1.5}/>
                 </div>
-                <span className="text-purple-700 font-black text-xl">ציור</span>
-                <span className="text-purple-300 font-bold text-xs text-center">תגידי מה תרצי<br/>ואני אצייר</span>
+                <span className="text-purple-700 font-black text-2xl">🎨 ציור</span>
               </button>
+
               <button onClick={() => setMode("photo")}
-                className="card py-8 px-4 flex flex-col items-center gap-3 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
-                <div className="w-20 h-20 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
-                  <Camera size={40} color="white" strokeWidth={1.5}/>
+                className="card py-10 px-4 flex flex-col items-center gap-4 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
+                <div className="w-24 h-24 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
+                  <Camera size={48} color="white" strokeWidth={1.5}/>
                 </div>
-                <span className="text-purple-700 font-black text-xl">תמונה</span>
-                <span className="text-purple-300 font-bold text-xs text-center">צלמי תמונה<br/>ואני אקשט אותה</span>
+                <span className="text-purple-700 font-black text-2xl">📸 תמונה</span>
               </button>
             </div>
-            {/* Story mode */}
+
             <button onClick={() => { setMode("story"); setStoryStep("character"); }}
-              className="card w-full py-6 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-indigo-200">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg shrink-0"
-                style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6,#ec4899)"}}>
-                <BookOpen size={30} color="white" strokeWidth={1.5}/>
+              className="card w-full py-8 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-indigo-200">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg shrink-0"
+                style={{ background:"linear-gradient(135deg,#6366f1,#8b5cf6,#ec4899)" }}>
+                <BookOpen size={36} color="white" strokeWidth={1.5}/>
               </div>
-              <div className="text-right">
-                <p className="text-purple-700 font-black text-xl">סיפור לפני שינה</p>
-                <p className="text-purple-300 font-bold text-sm">תגידי על מה הסיפור<br/>ובחרי מי יספר</p>
-              </div>
+              <span className="text-purple-700 font-black text-2xl">📖 סיפור</span>
             </button>
 
-            {/* Song mode — full width */}
-            <button onClick={selectSongMode}
-              className="card w-full py-6 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg shrink-0"
-                style={{background:"linear-gradient(135deg,#a855f7,#ec4899,#f97316)"}}>
-                <Music2 size={32} color="white" strokeWidth={1.5}/>
+            <button onClick={() => setMode("song")}
+              className="card w-full py-8 px-6 flex items-center gap-5 hover:shadow-xl transition-all active:scale-95 border-2 border-transparent hover:border-pink-200">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg shrink-0"
+                style={{ background:"linear-gradient(135deg,#a855f7,#ec4899,#f97316)" }}>
+                <Music2 size={36} color="white" strokeWidth={1.5}/>
               </div>
-              <div className="text-right">
-                <p className="text-purple-700 font-black text-xl">שיר</p>
-                <p className="text-purple-300 font-bold text-sm">תגידי על מה השיר<br/>ואני אלחין ואשיר</p>
-              </div>
+              <span className="text-purple-700 font-black text-2xl">🎵 שיר קריוקי</span>
             </button>
+
+            <GalleryRow items={gallery.items} onOpen={openGalleryItem}/>
           </div>
         )}
 
-        {/* Step 2 — photo upload */}
-        {mode === "photo" && isIdle && <PhotoInput onPhoto={setPhoto} />}
+        {/* ── Companion creator flow ──────────────────────── */}
+        {mode === "companion" && (
+          <CompanionCreator
+            kidName={activeUser.name}
+            onDone={(data) => { saveCompanion(data); setMode(null); }}
+            onBack={() => setMode(null)}
+          />
+        )}
 
-        {/* Story: character picker */}
+        {/* ── Photo upload ────────────────────────────────── */}
+        {mode === "photo" && isIdle && <PhotoInput onPhoto={setPhoto}/>}
+
+        {/* ── Story: character picker ─────────────────────── */}
         {mode === "story" && isIdle && storyStep === "character" && (
           <CharacterPicker
-            onSelect={(id) => { setStoryChar(id); setStoryStep("melody"); }}
-            onBack={() => { setMode(null); setStoryStep("mode"); }}
+            onSelect={(id) => { setStoryChar(id); setStoryStep("mic"); }}
+            onBack={() => { setMode(null); }}
           />
         )}
 
-        {/* Story: melody + video picker */}
-        {mode === "story" && isIdle && storyStep === "melody" && (
-          <div className="flex flex-col gap-4 animate-pop w-full">
-            <MelodyPicker
-              onConfirm={(mood) => { setStoryMood(mood); setStoryStep("video"); }}
-              onBack={() => setStoryStep("character")}
-            />
-          </div>
-        )}
-
-        {/* Story: video toggle */}
-        {mode === "story" && isIdle && storyStep === "video" && (
-          <div className="flex flex-col gap-5 animate-pop w-full">
-            <div className="text-center">
-              <p className="text-3xl font-black text-purple-800">רוצה גם סרטון? 🎬</p>
-              <p className="text-purple-300 font-bold text-sm mt-1">תמונות לכל סצנה בסיפור</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => { setStoryVideo(true); setStoryStep("mic"); }}
-                className="card py-8 flex flex-col items-center gap-3 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-purple-200">
-                <span className="text-5xl">🎬</span>
-                <span className="text-purple-700 font-black text-lg">כן! עם תמונות</span>
-                <span className="text-purple-300 text-xs text-center">קצת יותר זמן</span>
-              </button>
-              <button onClick={() => { setStoryVideo(false); setStoryStep("mic"); }}
-                className="card py-8 flex flex-col items-center gap-3 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-purple-200">
-                <span className="text-5xl">🎧</span>
-                <span className="text-purple-700 font-black text-lg">רק הקול</span>
-                <span className="text-purple-300 text-xs text-center">מהיר יותר</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2 — instrument picker (song mode) */}
-        {mode === "song" && isIdle && songStep === "instruments" && (
-          <InstrumentPicker
-            onConfirm={(chosen) => { setInstruments(chosen); setSongStep("mic"); }}
-            onBack={() => { setMode(null); setSongStep("mode"); }}
-          />
-        )}
-
-        {/* Step 2/3 — mic screen */}
-        {mode && !isDone && !isLoading &&
-         (mode !== "song"  || songStep  === "mic") &&
-         (mode !== "story" || storyStep === "mic") &&
-         storyStep !== "character" && storyStep !== "melody" && storyStep !== "video" && (
+        {/* ── Mic screen ──────────────────────────────────── */}
+        {mode && mode !== "companion" && !isDone && !isLoading &&
+         !(mode === "story" && storyStep === "character") && (
           <div className="flex flex-col items-center gap-6 animate-pop">
 
-            {/* Big instruction card */}
-            {isIdle && !transcript && songStep !== "instruments" &&
-             !["character","melody","video"].includes(storyStep) && (
-              <div className="card w-full px-6 py-6 text-center border-2 border-purple-100">
+            {isIdle && !transcript && (
+              <div className="card w-full px-6 py-7 text-center border-2 border-purple-100">
+                {companion && (
+                  <p className="text-purple-400 font-bold text-sm mb-2">
+                    {companion.name} יצור איתך! 🌟
+                  </p>
+                )}
                 <div className="flex justify-center mb-3">
-                  {mode === "photo" && !photo ? <ImagePlus size={44} className="text-pink-400" strokeWidth={1.5}/>
-                    : mode === "song" ? <Music2 size={44} className="text-pink-500" strokeWidth={1.5}/>
-                    : <Paintbrush2 size={44} className="text-purple-500" strokeWidth={1.5}/>}
+                  {mode === "photo" && !photo
+                    ? <ImagePlus size={52} className="text-pink-400" strokeWidth={1.5}/>
+                    : mode === "song"
+                    ? <Music2 size={52} className="text-pink-500" strokeWidth={1.5}/>
+                    : <Paintbrush2 size={52} className="text-purple-500" strokeWidth={1.5}/>}
                 </div>
-                <p className="text-2xl font-black text-purple-800">
-                  {mode === "photo" && !photo ? "בחרי תמונה"
+                <p className="text-3xl font-black text-purple-800">
+                  {mode === "photo" && !photo ? "בחר/י תמונה"
                     : mode === "song"  ? "על מה השיר?"
                     : mode === "story" ? "על מה הסיפור?"
-                    : "דברי מה תרצי!"}
+                    : "דבר/י מה תרצה/י!"}
                 </p>
-                <p className="text-purple-300 font-bold text-sm mt-1">
-                  {mode === "song"  ? "השיר יושר בקולך!"
-                  : mode === "story" ? "נסיכה • חללית • כלב קטן"
-                  : "כלב ורוד • חד קרן • נסיכה"}
+                <p className="text-purple-400 font-bold text-base mt-2">
+                  {mode === "song"  ? "🎤 שיר/י לי את הרעיון"
+                  : mode === "story" ? "🌟 נסיכה • חללית • כלב קטן"
+                  : "🦄 כלב ורוד • חד קרן • נסיכה"}
                 </p>
               </div>
             )}
 
-            {/* Transcript bubble */}
             {transcript && isIdle && (
               <div className="card w-full px-6 py-5 text-center border-2 border-purple-200 animate-pop">
-                <p className="text-sm font-bold text-purple-300 mb-1">כרמל אמרה 🎤</p>
+                <p className="text-sm font-bold text-purple-300 mb-1">{activeUser.name} אמר/ה 🎤</p>
                 <p className="text-2xl font-black text-purple-700">"{transcript}"</p>
               </div>
             )}
 
-            {/* Mic button */}
             <VoiceInput
               status={status}
               onTranscript={handleTranscript}
@@ -326,38 +397,37 @@ export default function App() {
               captureAudio={mode === "song"}
             />
 
-            {/* Bouncing finger — points at mic */}
-            {isIdle && !transcript && (mode === "voice" || (mode === "song" && songStep === "mic")) && (
+            {isIdle && !transcript && (mode === "voice" || mode === "song" || mode === "story") && (
               <div className="text-3xl animate-bounce -mt-2 opacity-50">👆</div>
             )}
-
           </div>
         )}
 
-        {/* Loading */}
+        {/* ── Loading ─────────────────────────────────────── */}
         {isLoading && (
           <>
             <LoadingScreen mode={mode}/>
             <button onClick={cancelLoading}
               className="card w-full py-4 flex items-center justify-center gap-3 text-gray-400 font-black hover:text-red-400 hover:shadow-md active:scale-95 transition-all border-2 border-gray-100">
-              <X size={20}/>
-              ביטול
+              <X size={20}/> ביטול
             </button>
           </>
         )}
 
-        {/* Painting result */}
+        {/* ── Results ─────────────────────────────────────── */}
         {isDone && result && (
           <ImageDisplay
             imageUrl={result.image_url}
             promptUsed={result.prompt_used}
             onShare={handleShare}
             onReset={reset}
-            onImproved={(data) => setResult(data)}
+            onImproved={(data) => {
+              setResult(data);
+              gallery.save({ type: "image", imageUrl: data.image_url, transcript });
+            }}
           />
         )}
 
-        {/* Story result */}
         {isDone && storyData && (
           <StoryPlayer
             storyText={storyData.story_text}
@@ -367,32 +437,52 @@ export default function App() {
             melodyUrl={storyData.melody_url}
             characterId={storyData.character_id}
             onReset={reset}
+            onShare={() => handleShareNative(
+              `${activeUser.name} יצר/ה סיפור:\n\n${storyData.story_text}`,
+              "סיפור מ-Sparkids"
+            )}
+            onImproved={(data) => {
+              setStoryData(prev => ({ ...data, melody_url: prev?.melody_url }));
+              gallery.save({ type: "story", characterId: storyData.character_id, transcript });
+            }}
           />
         )}
 
-        {/* Song result */}
         {isDone && song && (
           <SongPlayer
-            audioUrl={song.audio_url}
             instrumentalUrl={song.instrumental_url}
             lyrics={song.lyrics}
-            hasClonedVoice={hasClonedVoice}
+            style={song.style}
+            voiceType={song.voice_type}
+            instruments={song.instruments}
+            companionName={companion?.name}
             onReset={reset}
-            onCloneVoice={() => setShowClone(true)}
+            onShare={() => handleShareNative(
+              `${activeUser.name} יצר/ה שיר:\n\n${song.lyrics}`,
+              "שיר מ-Sparkids"
+            )}
+            onImproved={(data) => {
+              setSong(data);
+              gallery.save({ type: "song", transcript });
+            }}
           />
         )}
 
-        {/* Voice clone modal */}
         {showClone && (
           <VoiceClone
             onCloned={() => { setHasClonedVoice(true); setShowClone(false); }}
             onClose={() => { setShowClone(false); if (!hasClonedVoice) setMode(null); }}
           />
         )}
-
       </div>
 
-      {shareData && <ShareModal shareData={shareData} onClose={() => setShareData(null)} />}
+      {/* Persistent companion avatar */}
+      <CompanionAvatar
+        companion={companion}
+        onClick={() => { if (!mode) setMode("companion"); }}
+      />
+
+      {shareData && <ShareModal shareData={shareData} onClose={() => setShareData(null)}/>}
     </div>
   );
 }

@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, RotateCcw, Sparkles, Film, Mic } from "lucide-react";
+import { Play, Pause, Sparkles, Film, Mic, Wand2, Share2 } from "lucide-react";
+import axios from "axios";
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const IMPROVE_MSGS = ["כותבת מחדש...","מוסיפה הרפתקאות...","שוזרת מילים...","כמעט מוכן..."];
 
 const CHAR_INFO = {
   elsa:    { emoji: "👸", label: "אלזה",   bg: "from-blue-400 to-cyan-300" },
@@ -12,25 +16,30 @@ const CHAR_INFO = {
   lion:    { emoji: "🦁", label: "אריה",   bg: "from-yellow-400 to-amber-300" },
 };
 
-export default function StoryPlayer({ storyText, scenes, sceneImages, audioUrl, melodyUrl, characterId, onReset }) {
+export default function StoryPlayer({ storyText, scenes, sceneImages, audioUrl, melodyUrl, characterId, onReset, onImproved, onShare }) {
   const narrationRef = useRef(null);
   const melodyRef    = useRef(null);
-  const [playing, setPlaying]     = useState(false);
-  const [progress, setProgress]   = useState(0);
-  const [duration, setDuration]   = useState(0);
-  const [wordIdx, setWordIdx]     = useState(0);
-  const [sceneIdx, setSceneIdx]   = useState(0);
-  const [viewMode, setViewMode]   = useState(sceneImages?.length > 0 ? "video" : "text");
+  const [playing, setPlaying]   = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [wordIdx, setWordIdx]   = useState(0);
+  const [sceneIdx, setSceneIdx] = useState(0);
+  const [viewMode, setViewMode] = useState(sceneImages?.length > 0 ? "video" : "text");
+  const [improving, setImproving]   = useState(false);
+  const [listening, setListening]   = useState(false);
+  const [liveText, setLiveText]     = useState("");
+  const [msgIdx, setMsgIdx]         = useState(0);
+  const recognitionRef = useRef(null);
+  const collectedRef   = useRef("");
 
-  const char  = CHAR_INFO[characterId] || CHAR_INFO.grandma;
-  const words = storyText?.split(/\s+/) || [];
-  const hasVideo   = sceneImages?.length > 0;
-  const hasMelody  = !!melodyUrl;
+  const char    = CHAR_INFO[characterId] || CHAR_INFO.grandma;
+  const words   = storyText?.split(/\s+/) || [];
+  const hasVideo  = sceneImages?.length > 0;
+  const hasMelody = !!melodyUrl;
 
   useEffect(() => {
     const a = narrationRef.current;
     if (!a) return;
-    a.onloadedmetadata = () => setDuration(a.duration);
+    a.onloadedmetadata = () => {};
     a.ontimeupdate = () => {
       const pct = a.currentTime / (a.duration || 1);
       setProgress(pct);
@@ -48,47 +57,81 @@ export default function StoryPlayer({ storyText, scenes, sceneImages, audioUrl, 
     m.loop = true;
   }, [melodyUrl]);
 
+  useEffect(() => {
+    if (!improving) return;
+    setMsgIdx(0);
+    const t = setInterval(() => setMsgIdx(i => (i + 1) % IMPROVE_MSGS.length), 1600);
+    return () => clearInterval(t);
+  }, [improving]);
+
+  useEffect(() => {
+    if (!listening) return;
+    const stop = () => stopFeedback();
+    window.addEventListener("mouseup", stop);
+    window.addEventListener("touchend", stop);
+    return () => { window.removeEventListener("mouseup", stop); window.removeEventListener("touchend", stop); };
+  }, [listening]);
+
+  function startFeedback() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR || listening || improving) return;
+    collectedRef.current = ""; setLiveText("");
+    const r = new SR();
+    r.lang = "he-IL"; r.interimResults = true; r.continuous = true;
+    r.onresult = (e) => {
+      let text = "";
+      for (const res of e.results) text += res[0].transcript;
+      collectedRef.current = text; setLiveText(text);
+    };
+    r.onerror = () => {};
+    recognitionRef.current = r;
+    r.start(); setListening(true);
+  }
+
+  function stopFeedback() {
+    recognitionRef.current?.stop(); setListening(false);
+    setTimeout(async () => {
+      const text = collectedRef.current.trim();
+      setLiveText(""); collectedRef.current = "";
+      if (!text || !onImproved) return;
+      setImproving(true);
+      try {
+        const { data } = await axios.post(`${API}/story/improve`, {
+          feedback: text,
+          previous_story_text: storyText,
+          character_id: characterId,
+        });
+        onImproved(data);
+      } finally { setImproving(false); }
+    }, 400);
+  }
+
   function toggle() {
     const a = narrationRef.current;
     const m = melodyRef.current;
     if (!a) return;
-    if (playing) {
-      a.pause(); m?.pause(); setPlaying(false);
-    } else {
-      a.play(); m?.play(); setPlaying(true);
-    }
+    if (playing) { a.pause(); m?.pause(); setPlaying(false); }
+    else         { a.play();  m?.play();  setPlaying(true);  }
   }
-
-  function restart() {
-    const a = narrationRef.current;
-    const m = melodyRef.current;
-    if (!a) return;
-    a.currentTime = 0; if (m) m.currentTime = 0;
-    setWordIdx(0); setSceneIdx(0);
-    a.play(); m?.play(); setPlaying(true);
-  }
-
-  const mins = Math.floor(duration / 60);
-  const secs = Math.floor(duration % 60).toString().padStart(2, "0");
 
   return (
     <div className="flex flex-col gap-4 w-full animate-pop">
 
-      {/* View toggle */}
+      {/* View toggle — only if we have video */}
       {hasVideo && (
         <div className="card p-1.5 flex gap-1">
-          {[["video", Film, "📽️ וידאו"], ["text", Mic, "📖 טקסט"]].map(([m, Icon, label]) => (
+          {[["video", "🎬", "סרטון"], ["text", "📖", "טקסט"]].map(([m, icon, label]) => (
             <button key={m} onClick={() => setViewMode(m)}
-              className={`flex-1 py-2.5 rounded-xl font-black text-base transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-3 rounded-xl font-black text-lg transition-all flex items-center justify-center gap-2 ${
                 viewMode === m ? "bg-purple-600 text-white shadow" : "text-gray-400"
               }`}>
-              <Icon size={18} strokeWidth={2}/> {label}
+              <span>{icon}</span> {label}
             </button>
           ))}
         </div>
       )}
 
-      {/* Video mode — scene image slideshow */}
+      {/* Video mode */}
       {viewMode === "video" && hasVideo && (
         <div className="card overflow-hidden relative">
           <img
@@ -97,55 +140,43 @@ export default function StoryPlayer({ storyText, scenes, sceneImages, audioUrl, 
             className="w-full object-cover transition-opacity duration-700"
             key={sceneIdx}
           />
-          {/* Scene indicator dots */}
           <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-2">
             {sceneImages.map((_, i) => (
-              <div key={i} className={`w-2.5 h-2.5 rounded-full transition-all ${i === sceneIdx ? "bg-white scale-125" : "bg-white/40"}`}/>
+              <div key={i} className={`w-3 h-3 rounded-full transition-all ${i === sceneIdx ? "bg-white scale-125" : "bg-white/40"}`}/>
             ))}
           </div>
-          {/* Character badge */}
           <div className={`absolute top-3 right-3 bg-gradient-to-br ${char.bg} rounded-2xl px-3 py-1.5 flex items-center gap-2 shadow-lg`}>
             <span className="text-2xl">{char.emoji}</span>
             <span className="text-white font-black text-sm">{char.label}</span>
           </div>
-          {/* Progress bar */}
           <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/20">
-            <div className="h-full bg-white/80 transition-all duration-300" style={{width:`${progress*100}%`}}/>
+            <div className="h-full bg-white/80 transition-all duration-300" style={{ width: `${progress*100}%` }}/>
           </div>
         </div>
       )}
 
-      {/* Text mode — character header + highlighted words */}
+      {/* Text mode — character header */}
       {viewMode === "text" && (
         <div className={`card bg-gradient-to-br ${char.bg} py-6 flex flex-col items-center gap-3`}>
           <span className="text-7xl animate-float">{char.emoji}</span>
           <p className="font-black text-white text-xl">{char.label} מספרת</p>
           <div className="w-full px-4">
-            <div className="h-1.5 bg-white/30 rounded-full overflow-hidden">
-              <div className="h-full bg-white/90 rounded-full transition-all duration-300" style={{width:`${progress*100}%`}}/>
+            <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+              <div className="h-full bg-white/90 rounded-full transition-all duration-300" style={{ width: `${progress*100}%` }}/>
             </div>
           </div>
         </div>
       )}
 
-      {/* Controls */}
-      <div className="card px-6 py-4 flex items-center justify-between">
-        <button onClick={restart}
-          className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600 hover:bg-purple-200 active:scale-95 transition-all">
-          <RotateCcw size={22} strokeWidth={2}/>
-        </button>
-        <button onClick={toggle}
-          className="w-20 h-20 rounded-full shimmer-btn flex items-center justify-center shadow-xl active:scale-95 transition-all">
-          {playing
-            ? <Pause size={34} color="white" strokeWidth={2}/>
-            : <Play  size={34} color="white" strokeWidth={2} fill="white"/>}
-        </button>
-        <span className="text-purple-400 font-bold text-sm w-12 text-center">
-          {hasMelody ? "🎵" : ""} {mins}:{secs}
-        </span>
-      </div>
+      {/* Single play/pause button */}
+      <button onClick={toggle}
+        className="w-full py-5 rounded-3xl shimmer-btn flex items-center justify-center shadow-xl active:scale-95 transition-all gap-3">
+        {playing
+          ? <><Pause size={34} color="white" strokeWidth={2}/><span className="text-white font-black text-xl">עצרי</span></>
+          : <><Play  size={34} color="white" strokeWidth={2} fill="white"/><span className="text-white font-black text-xl">נגני</span></>}
+      </button>
 
-      {/* Story text with word highlight (always visible in text mode) */}
+      {/* Story text with word highlight */}
       {viewMode === "text" && (
         <div className="card px-5 py-4 border-2 border-purple-100 max-h-52 overflow-y-auto" dir="rtl">
           <p className="text-purple-800 font-bold leading-loose text-lg">
@@ -159,18 +190,49 @@ export default function StoryPlayer({ storyText, scenes, sceneImages, audioUrl, 
         </div>
       )}
 
-      {/* Scene text (in video mode show current scene) */}
+      {/* Scene text in video mode */}
       {viewMode === "video" && scenes?.[sceneIdx] && (
         <div className="card px-5 py-3 border-2 border-purple-100" dir="rtl">
           <p className="text-purple-700 font-bold leading-relaxed">{scenes[sceneIdx]}</p>
         </div>
       )}
 
-      {/* New story */}
-      <button onClick={onReset}
-        className="card py-4 flex items-center justify-center gap-3 text-purple-600 font-black hover:shadow-lg active:scale-95 transition-all border-2 border-purple-100">
-        <Sparkles size={22} strokeWidth={2}/> סיפור חדש
-      </button>
+      {/* Live transcript while listening */}
+      {listening && liveText && (
+        <div className="card px-5 py-3 text-center border-2 border-red-100 animate-pop">
+          <p className="text-purple-700 font-bold text-lg leading-snug">{liveText}</p>
+        </div>
+      )}
+
+      {/* Improve story */}
+      {onImproved && (
+        <button
+          onMouseDown={startFeedback}
+          onTouchStart={(e) => { e.preventDefault(); startFeedback(); }}
+          disabled={improving}
+          className={`w-full py-5 rounded-3xl font-black text-xl transition-all select-none flex items-center gap-3 px-6
+            ${improving ? "bg-purple-100 text-purple-400 cursor-not-allowed justify-center" :
+              listening  ? "bg-red-500 text-white shadow-lg justify-start" :
+              "shimmer-btn text-white shadow-lg hover:opacity-90 active:scale-95 justify-center"}`}
+        >
+          <Wand2 size={26} strokeWidth={2} className="shrink-0"/>
+          <span>{improving ? IMPROVE_MSGS[msgIdx] : listening ? (liveText || "מקשיבה...") : "שני את הסיפור"}</span>
+        </button>
+      )}
+
+      {/* Share + New story */}
+      <div className={`grid gap-3 ${onShare ? "grid-cols-2" : "grid-cols-1"}`}>
+        {onShare && (
+          <button onClick={onShare}
+            className="card py-5 flex items-center justify-center gap-3 text-orange-500 font-black text-xl hover:shadow-lg active:scale-95 transition-all border-2 border-orange-100">
+            <Share2 size={26} strokeWidth={2}/> תראי לאמא
+          </button>
+        )}
+        <button onClick={onReset}
+          className="card py-5 flex items-center justify-center gap-3 text-purple-600 font-black text-xl hover:shadow-lg active:scale-95 transition-all border-2 border-purple-100">
+          <Sparkles size={26} strokeWidth={2}/> סיפור חדש
+        </button>
+      </div>
 
       <audio ref={narrationRef} src={audioUrl} preload="auto"/>
       {melodyUrl && <audio ref={melodyRef} src={melodyUrl} preload="auto"/>}

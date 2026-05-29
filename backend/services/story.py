@@ -10,14 +10,46 @@ load_dotenv()
 _gemini = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
 CHARACTERS = {
-    "elsa":    {"voice": "Kore",    "persona": "You are a graceful ice queen with a warm heart. Tell the story magically with wonder and sparkle."},
-    "grandma": {"voice": "Aoede",   "persona": "You are a sweet grandma. Speak slowly and warmly. Add 'יקירי' and 'מאמי' occasionally."},
-    "grandpa": {"voice": "Charon",  "persona": "You are a funny grandpa full of wisdom and humor. Add old sayings. Speak slowly and warmly."},
-    "baby":    {"voice": "Puck",    "persona": "You are a very young child telling a story. Use simple cute words, be adorable and funny."},
-    "robot":   {"voice": "Zephyr",  "persona": "You are a funny robot. Add BEEP BOOP between sentences. Use robotic but warm language."},
-    "dragon":  {"voice": "Fenrir",  "persona": "You are a friendly dramatic dragon. Add [ROAR!] occasionally but stay warm and funny."},
-    "wizard":  {"voice": "Schedar", "persona": "You are a wise funny wizard. Add magic words like אברקדברא. Be mysterious but loving."},
-    "lion":    {"voice": "Orus",    "persona": "You are a royal lion king. Be majestic and brave but gentle and loving."},
+    "elsa":    {
+        "voice": "Kore",
+        "tts_style": "Read as a graceful, magical ice queen — elegant, warm, with wonder in your voice.",
+        "persona": "You are a graceful ice queen with a warm heart. Tell the story magically with wonder and sparkle.",
+    },
+    "grandma": {
+        "voice": "Aoede",
+        "tts_style": "Read slowly and warmly like a sweet grandmother telling a bedtime story to her grandchild.",
+        "persona": "You are a sweet grandma. Speak slowly and warmly. Add 'יקירי' and 'מאמי' occasionally.",
+    },
+    "grandpa": {
+        "voice": "Charon",
+        "tts_style": "Read as a funny, wise old grandfather — slow, warm, with a twinkle of humor.",
+        "persona": "You are a funny grandpa full of wisdom and humor. Add old sayings. Speak slowly and warmly.",
+    },
+    "baby":    {
+        "voice": "Puck",
+        "tts_style": "Read as a very young toddler — high-pitched, cute, stumbling over big words, adorably funny.",
+        "persona": "You are a very young child telling a story. Use simple cute words, be adorable and funny.",
+    },
+    "robot":   {
+        "voice": "Zephyr",
+        "tts_style": "Read as a friendly robot — staccato, slightly mechanical but warm. Add BEEP or BOOP between sentences.",
+        "persona": "You are a funny robot. Add BEEP BOOP between sentences. Use robotic but warm language.",
+    },
+    "dragon":  {
+        "voice": "Fenrir",
+        "tts_style": "Read as a dramatic, friendly dragon — deep, rumbling, excitable. Occasionally add a little roar.",
+        "persona": "You are a friendly dramatic dragon. Add [ROAR!] occasionally but stay warm and funny.",
+    },
+    "wizard":  {
+        "voice": "Schedar",
+        "tts_style": "Read as a mysterious, wise wizard — slow, mystical, drawing out magical words with gravitas.",
+        "persona": "You are a wise funny wizard. Add magic words like אברקדברא. Be mysterious but loving.",
+    },
+    "lion":    {
+        "voice": "Charon",
+        "tts_style": "Read as a deep-voiced, majestic lion king — slow, powerful, regal, but gentle and loving.",
+        "persona": "You are a royal lion king. Be majestic and brave but gentle and loving.",
+    },
 }
 
 MELODY_MOODS = {
@@ -39,15 +71,14 @@ def _pcm_to_wav(pcm: bytes, rate: int = 24000) -> bytes:
 
 
 def _generate_scene_image(scene_desc: str) -> str:
-    """Generate one scene image, return base64 data URL."""
     prompt_resp = _gemini.models.generate_content(
         model="gemini-2.5-flash",
         contents=(
-            f"Write a vivid, colorful image-generation prompt for this children's story scene (max 30 words, English only, no copyrighted names): {scene_desc}"
+            f"Write a vivid, colorful image-generation prompt for this children's story scene "
+            f"(max 30 words, English only, no copyrighted names): {scene_desc}"
         )
     )
     img_prompt = prompt_resp.text.strip()
-
     img_resp = _gemini.models.generate_content(
         model="gemini-2.5-flash-image",
         contents=f"Children's book illustration, soft watercolor style, warm colors: {img_prompt}",
@@ -65,7 +96,6 @@ def _generate_scene_image(scene_desc: str) -> str:
 
 
 def _generate_melody(mood: str) -> str:
-    """Generate background instrumental with Lyria, return base64 data URL."""
     style = MELODY_MOODS.get(mood, MELODY_MOODS["lullaby"])
     resp = _gemini.models.generate_content(
         model="lyria-3-pro-preview",
@@ -83,15 +113,23 @@ def _generate_melody(mood: str) -> str:
     return None
 
 
-def generate_story(idea: str, character_id: str, melody_mood: str = None, include_video: bool = False) -> dict:
+def generate_story(idea: str, character_id: str, melody_mood: str = None,
+                   include_video: bool = False, preferences: str = "",
+                   companion_name: str = "", companion_likes: str = "") -> dict:
     char = CHARACTERS.get(character_id, CHARACTERS["grandma"])
+    pref_line = f"\nChild's taste profile: {preferences}" if preferences else ""
+    companion_line = ""
+    if companion_name:
+        companion_line = f"\nIMPORTANT: The main character of the story must be named '{companion_name}'"
+        if companion_likes:
+            companion_line += f" and loves {companion_likes}"
+        companion_line += ". Make the child's companion the hero of the story."
 
-    # 1. Generate story split into scenes
     story_resp = _gemini.models.generate_content(
         model="gemini-2.5-flash",
         contents=(
             f"{char['persona']}\n\n"
-            f"Write a SHORT funny Hebrew bedtime story about: '{idea}'.\n"
+            f"Write a SHORT funny Hebrew bedtime story about: '{idea}'.{pref_line}{companion_line}\n"
             "Format as exactly 4 scenes separated by '---SCENE---'.\n"
             "Each scene: 2-3 sentences. Total: 150-200 words.\n"
             "Rules: Hebrew only, funny and warm, ends with happy sleep, no copyrighted names.\n"
@@ -102,39 +140,74 @@ def generate_story(idea: str, character_id: str, melody_mood: str = None, includ
     scenes = [s.strip() for s in full_text.split("---SCENE---") if s.strip()]
     story_text = " ".join(scenes)
 
-    print(f"[story] char={character_id} scenes={len(scenes)} mood={melody_mood} video={include_video}")
+    print(f"[story] char={character_id} voice={char['voice']} scenes={len(scenes)} companion={companion_name}")
 
-    # 2. Run TTS + images in parallel, melody separately after (API rate limits)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        tts_future  = ex.submit(_generate_tts, story_text, char["voice"])
-        img_futures = [ex.submit(_generate_scene_image, s) for s in scenes] if include_video else []
-        audio_url    = tts_future.result()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        tts_future    = ex.submit(_generate_tts, story_text, char["voice"], char["tts_style"])
+        melody_future = ex.submit(_generate_melody, melody_mood) if melody_mood else None
+        img_futures   = [ex.submit(_generate_scene_image, s) for s in scenes] if include_video else []
+
+        audio_url   = tts_future.result()
+        melody_url  = None
+        if melody_future:
+            try:
+                melody_url = melody_future.result()
+                print(f"[story] melody ok: {len(melody_url)} chars")
+            except Exception as e:
+                print(f"[story] melody failed: {e}")
+
         scene_images = [f.result() for f in img_futures]
 
-    # melody after to avoid concurrent Lyria conflicts
-    melody_url = None
-    if melody_mood:
-        try:
-            melody_url = _generate_melody(melody_mood)
-            print(f"[story] melody generated: {len(melody_url)} chars")
-        except Exception as e:
-            print(f"[story] melody failed: {e}")
-
     return {
-        "story_text":    story_text,
-        "scenes":        scenes,
-        "scene_images":  [img for img in scene_images if img],
-        "audio_url":     audio_url,
-        "melody_url":    melody_url,
-        "character_id":  character_id,
-        "voice_used":    char["voice"],
+        "story_text":   story_text,
+        "scenes":       scenes,
+        "scene_images": [img for img in scene_images if img],
+        "audio_url":    audio_url,
+        "melody_url":   melody_url,
+        "character_id": character_id,
+        "voice_used":   char["voice"],
     }
 
 
-def _generate_tts(text: str, voice_name: str) -> str:
+def improve_story(feedback: str, previous_story_text: str, character_id: str) -> dict:
+    char = CHARACTERS.get(character_id, CHARACTERS["grandma"])
+
+    story_resp = _gemini.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=(
+            f"{char['persona']}\n\n"
+            f"A child gave feedback on their story (in Hebrew or baby talk): '{feedback}'.\n"
+            f"Current story:\n{previous_story_text}\n\n"
+            "Rewrite the story applying the child's request. Keep the same characters and general theme.\n"
+            "Format as exactly 4 scenes separated by '---SCENE---'.\n"
+            "Each scene: 2-3 sentences. Total: 150-200 words.\n"
+            "Rules: Hebrew only, funny and warm, ends with happy sleep, no copyrighted names.\n"
+            "Return ONLY the story with scene separators, no title."
+        )
+    )
+    full_text = story_resp.text.strip()
+    scenes = [s.strip() for s in full_text.split("---SCENE---") if s.strip()]
+    story_text = " ".join(scenes)
+
+    print(f"[story/improve] char={character_id} feedback={feedback[:40]}")
+    audio_url = _generate_tts(story_text, char["voice"], char["tts_style"])
+
+    return {
+        "story_text":   story_text,
+        "scenes":       scenes,
+        "scene_images": [],
+        "audio_url":    audio_url,
+        "melody_url":   None,
+        "character_id": character_id,
+        "voice_used":   char["voice"],
+    }
+
+
+def _generate_tts(text: str, voice_name: str, tts_style: str = "") -> str:
+    style_prefix = f"{tts_style}\n\n" if tts_style else ""
     resp = _gemini.models.generate_content(
         model="gemini-2.5-flash-preview-tts",
-        contents=f"Read this Hebrew children's bedtime story expressively and warmly:\n\n{text}",
+        contents=f"{style_prefix}Text to read (Hebrew):\n\n{text}",
         config=types.GenerateContentConfig(
             response_modalities=["AUDIO"],
             speech_config=types.SpeechConfig(

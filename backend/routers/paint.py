@@ -9,14 +9,17 @@ router = APIRouter()
 class PaintRequest(BaseModel):
     idea: str
     kid_name: str
-    photo: Optional[str] = None  # base64 data URL
+    photo: Optional[str] = None
+    preferences: Optional[str] = None
+    companion_name: Optional[str] = None
+    companion_desc: Optional[str] = None
 
 
 class ImproveRequest(BaseModel):
     feedback: str
     previous_prompt: str
     kid_name: str
-    current_image: Optional[str] = None  # base64 data URL of current image
+    current_image: Optional[str] = None
 
 
 class PaintResponse(BaseModel):
@@ -28,7 +31,13 @@ class PaintResponse(BaseModel):
 def paint(req: PaintRequest):
     if len(req.idea.strip()) < 1:
         raise HTTPException(400, "תגידי לי מה לצייר!")
-    prompt = make_kid_prompt(req.idea, has_photo=bool(req.photo))
+    prompt = make_kid_prompt(
+        req.idea,
+        has_photo=bool(req.photo),
+        preferences=req.preferences or "",
+        companion_name=req.companion_name or "",
+        companion_desc=req.companion_desc or "",
+    )
     if req.photo:
         image_url = generate_image_from_photo(prompt, req.photo)
     else:
@@ -40,9 +49,7 @@ def paint(req: PaintRequest):
 def improve(req: ImproveRequest):
     prompt = make_improve_prompt(req.feedback, req.previous_prompt)
     if req.current_image:
-        print(f"[improve] using current image as reference, feedback='{req.feedback}'")
         image_url = generate_image_from_photo(prompt, req.current_image)
     else:
-        print(f"[improve] no image reference, regenerating from prompt")
         image_url = generate_image(prompt)
     return PaintResponse(image_url=image_url, prompt_used=prompt)
