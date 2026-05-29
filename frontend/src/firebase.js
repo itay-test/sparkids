@@ -1,28 +1,36 @@
+// Firebase is optional. If VITE_FIREBASE_API_KEY is missing or "REPLACE_ME",
+// the app runs in LOCAL MODE using localStorage — no login required.
+
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// ─── SETUP INSTRUCTIONS ────────────────────────────────────────────────────
-// 1. Go to https://console.firebase.google.com
-// 2. Create project "nitzutz" (or "sparkids")
-// 3. Add Web App → copy config below
-// 4. Enable Authentication → Sign-in method → Google
-// 5. Enable Firestore Database → Start in production mode
-// 6. Add Firestore security rules (see DEPLOY.md)
-// ───────────────────────────────────────────────────────────────────────────
-const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || "REPLACE_ME",
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || "REPLACE_ME",
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || "REPLACE_ME",
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || "REPLACE_ME",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID|| "REPLACE_ME",
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || "REPLACE_ME",
-};
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+export const FIREBASE_ENABLED = !!(apiKey && apiKey !== "REPLACE_ME");
 
-const app      = initializeApp(firebaseConfig);
-export const auth     = getAuth(app);
-export const db       = getFirestore(app);
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: "select_account" });
+let _auth = null;
+let _db   = null;
+let _googleProvider = null;
 
-export default app;
+if (FIREBASE_ENABLED) {
+  try {
+    const app = initializeApp({
+      apiKey,
+      authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+      projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+    });
+    _auth           = getAuth(app);
+    _db             = getFirestore(app);
+    _googleProvider = new GoogleAuthProvider();
+    _googleProvider.setCustomParameters({ prompt: "select_account" });
+  } catch (e) {
+    console.warn("[firebase] init failed, switching to local mode:", e.message);
+  }
+}
+
+export const auth           = _auth;
+export const db             = _db;
+export const googleProvider = _googleProvider;
