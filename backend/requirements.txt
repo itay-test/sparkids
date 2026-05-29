@@ -4,3 +4,5 @@ google-genai==1.47.0
 elevenlabs==2.49.0
 python-dotenv==1.0.1
 pydantic==2.9.2
+firebase-admin
+stripe
