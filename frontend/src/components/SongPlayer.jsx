@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Pause, Sparkles, Music2, Mic, Wand2 } from "lucide-react";
+// No Lucide icons in child-facing karaoke player — emoji only (Noa's design rule)
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -101,7 +101,7 @@ export default function SongPlayer({ instrumentalUrl, lyrics, style, voiceType, 
 
         {/* Karaoke badge */}
         <div className="absolute top-3 right-3 bg-white/20 rounded-2xl px-3 py-1.5 flex items-center gap-1.5">
-          <Mic size={14} color="white"/>
+          <span className="text-sm">🎤</span>
           <span className="text-white font-black text-xs">שיר קריוקי!</span>
         </div>
 
@@ -143,20 +143,19 @@ export default function SongPlayer({ instrumentalUrl, lyrics, style, voiceType, 
         </div>
       </div>
 
-      {/* Play / pause */}
+      {/* Play / pause — 96px tall, emoji + text */}
       <button onClick={toggle}
-        className="w-full py-5 rounded-3xl shimmer-btn flex items-center justify-center shadow-xl active:scale-95 transition-all gap-3">
-        {playing
-          ? <><Pause size={34} color="white" strokeWidth={2}/><span className="text-white font-black text-xl">עצור</span></>
-          : <><Play  size={34} color="white" strokeWidth={2} fill="white"/><span className="text-white font-black text-xl">נגן</span></>}
+        className="w-full py-8 rounded-3xl shimmer-btn flex items-center justify-center shadow-xl active:scale-95 transition-all gap-4">
+        <span className="text-5xl leading-none">{playing ? "⏸️" : "▶️"}</span>
+        <span className="text-white font-black text-3xl">{playing ? "עצור" : "נגן!"}</span>
       </button>
 
-      {/* Encourage singing */}
+      {/* Encourage singing — fullscreen feel when playing */}
       {playing && (
-        <div className="card px-5 py-3 flex items-center justify-center gap-3 border-2 border-purple-100 animate-pop">
-          <span className="text-2xl animate-bounce">🎤</span>
-          <span className="text-purple-600 font-black text-lg">שיר/י איתנו!</span>
-          <span className="text-2xl animate-bounce" style={{ animationDelay: "0.2s" }}>⭐</span>
+        <div className="card px-5 py-4 flex items-center justify-center gap-4 border-2 border-purple-100 animate-pop">
+          <span className="text-5xl animate-bounce">🎤</span>
+          <span className="text-purple-600 font-black text-2xl">שיר/י איתי!</span>
+          <span className="text-5xl animate-bounce" style={{ animationDelay: "0.3s" }}>🌟</span>
         </div>
       )}
 
@@ -173,13 +172,13 @@ export default function SongPlayer({ instrumentalUrl, lyrics, style, voiceType, 
           onMouseDown={startFeedback}
           onTouchStart={(e) => { e.preventDefault(); startFeedback(); }}
           disabled={improving}
-          className={`w-full py-5 rounded-3xl font-black text-xl transition-all select-none flex items-center gap-3 px-6
+          className={`w-full py-7 rounded-3xl font-black text-xl transition-all select-none flex items-center gap-3 px-6
             ${improving ? "bg-purple-100 text-purple-400 cursor-not-allowed justify-center" :
               listening  ? "bg-red-500 text-white shadow-lg justify-start" :
               "shimmer-btn text-white shadow-lg hover:opacity-90 active:scale-95 justify-center"}`}
         >
-          <Wand2 size={26} strokeWidth={2} className="shrink-0"/>
-          <span>{improving ? IMPROVE_MSGS[msgIdx] : listening ? (liveText || "מקשיב/ה...") : "שנה/י את השיר"}</span>
+          <span className="text-3xl shrink-0">🪄</span>
+          <span className="text-2xl">{improving ? IMPROVE_MSGS[msgIdx] : listening ? (liveText || "מקשיב/ה...") : "שנה/י את השיר"}</span>
         </button>
       )}
 
@@ -197,9 +196,7 @@ export default function SongPlayer({ instrumentalUrl, lyrics, style, voiceType, 
 
         <button onClick={onReset}
           className="card py-5 flex flex-col items-center gap-2 hover:shadow-lg active:scale-95 transition-all border-2 border-purple-100">
-          <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center">
-            <Sparkles size={24} className="text-purple-600" strokeWidth={2}/>
-          </div>
+          <span className="text-4xl">✨</span>
           <span className="text-sm font-black text-purple-600">שיר חדש</span>
         </button>
       </div>

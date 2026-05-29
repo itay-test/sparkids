@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ChevronLeft } from "lucide-react";
 
 const CHARACTERS = [
   { id: "elsa",    emoji: "👸", label: "נסיכה",  color: "from-blue-300 to-cyan-200" },
@@ -47,8 +46,8 @@ export default function CharacterPicker({ onSelect, onBack }) {
       </div>
 
       <button onClick={onBack}
-        className="card w-full py-4 flex items-center justify-center gap-2 text-purple-400 font-black text-lg active:scale-95 transition-all border-2 border-purple-100 hover:border-purple-300">
-        <ChevronLeft size={24}/> חזרי
+        className="card w-full py-5 flex items-center justify-center gap-3 text-purple-500 font-black text-xl active:scale-95 transition-all border-2 border-purple-100 hover:border-purple-300">
+        ← חזרה
       </button>
     </div>
   );

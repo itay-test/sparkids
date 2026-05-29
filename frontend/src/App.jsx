@@ -19,7 +19,7 @@ import Logo from "./components/Logo";
 import { useCompanion } from "./hooks/useCompanion";
 import { usePreferences } from "./hooks/usePreferences";
 import { useGallery } from "./hooks/useGallery";
-import { Mic, Camera, ArrowLeft, X, Paintbrush2, ImagePlus, Music2, BookOpen, UserCircle2 } from "lucide-react";
+import { ArrowLeft, X, UserCircle2 } from "lucide-react";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -342,44 +342,36 @@ function AppInner() {
                     <p className="text-purple-400 font-bold text-sm">אוהב/ת: {companion.likes.slice(0,2).join(", ")}</p>
                   )}
                 </div>
-                <span className="text-purple-300 text-sm font-bold">שנה/י</span>
+                <span className="text-2xl">✏️</span>
               </button>
             )}
 
-            {/* Mode cards */}
+            {/* Mode cards — emoji-first, no Lucide icons */}
             <div className="grid grid-cols-2 gap-4 w-full">
               <button onClick={() => setMode("voice")}
-                className="card py-10 px-4 flex flex-col items-center gap-4 hover:shadow-xl active:scale-95 border-2 border-transparent hover:border-purple-200">
-                <div className="w-24 h-24 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
-                  <Mic size={48} color="white" strokeWidth={1.5}/>
-                </div>
-                <span className="text-purple-700 font-black text-2xl">🎨 ציור</span>
+                className="card py-8 px-4 flex flex-col items-center gap-3 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-purple-200"
+                style={{ minHeight: 180 }}>
+                <span className="text-8xl leading-none" style={{ animation:"float 3s ease-in-out infinite alternate" }}>🎨</span>
+                <span className="text-purple-700 font-black text-3xl">ציור</span>
               </button>
               <button onClick={() => setMode("photo")}
-                className="card py-10 px-4 flex flex-col items-center gap-4 hover:shadow-xl active:scale-95 border-2 border-transparent hover:border-pink-200">
-                <div className="w-24 h-24 shimmer-btn rounded-full flex items-center justify-center shadow-lg">
-                  <Camera size={48} color="white" strokeWidth={1.5}/>
-                </div>
-                <span className="text-purple-700 font-black text-2xl">📸 תמונה</span>
+                className="card py-8 px-4 flex flex-col items-center gap-3 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-pink-200"
+                style={{ minHeight: 180 }}>
+                <span className="text-8xl leading-none" style={{ animation:"float 3.5s ease-in-out infinite alternate", animationDelay:"0.5s" }}>📸</span>
+                <span className="text-purple-700 font-black text-3xl">תמונה</span>
               </button>
             </div>
 
             <button onClick={() => { setMode("story"); setStoryStep("character"); }}
-              className="card w-full py-8 px-6 flex items-center gap-5 hover:shadow-xl active:scale-95 border-2 border-transparent hover:border-indigo-200">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg shrink-0"
-                style={{ background:"linear-gradient(135deg,#6366f1,#8b5cf6,#ec4899)" }}>
-                <BookOpen size={36} color="white" strokeWidth={1.5}/>
-              </div>
-              <span className="text-purple-700 font-black text-2xl">📖 סיפור</span>
+              className="card w-full py-8 px-8 flex items-center gap-6 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-indigo-200">
+              <span className="text-8xl leading-none shrink-0" style={{ animation:"float 4s ease-in-out infinite alternate", animationDelay:"1s" }}>📖</span>
+              <span className="text-purple-700 font-black text-4xl">סיפור</span>
             </button>
 
             <button onClick={() => setMode("song")}
-              className="card w-full py-8 px-6 flex items-center gap-5 hover:shadow-xl active:scale-95 border-2 border-transparent hover:border-pink-200">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg shrink-0"
-                style={{ background:"linear-gradient(135deg,#a855f7,#ec4899,#f97316)" }}>
-                <Music2 size={36} color="white" strokeWidth={1.5}/>
-              </div>
-              <span className="text-purple-700 font-black text-2xl">🎵 שיר קריוקי</span>
+              className="card w-full py-8 px-8 flex items-center gap-6 hover:shadow-xl active:scale-95 transition-all border-2 border-transparent hover:border-pink-200">
+              <span className="text-8xl leading-none shrink-0" style={{ animation:"float 3.8s ease-in-out infinite alternate", animationDelay:"1.5s" }}>🎤</span>
+              <span className="text-purple-700 font-black text-4xl">שיר קריוקי</span>
             </button>
 
             {/* Upgrade nudge for free users close to limit */}
@@ -425,9 +417,12 @@ function AppInner() {
                   <p className="text-purple-400 font-bold text-sm mb-2">{companion.name} יצור איתך! 🌟</p>
                 )}
                 <div className="flex justify-center mb-3">
-                  {mode === "photo" && !photo ? <ImagePlus size={52} className="text-pink-400" strokeWidth={1.5}/>
-                    : mode === "song" ? <Music2 size={52} className="text-pink-500" strokeWidth={1.5}/>
-                    : <Paintbrush2 size={52} className="text-purple-500" strokeWidth={1.5}/>}
+                  <span className="text-8xl leading-none" style={{ animation:"float 3s ease-in-out infinite alternate" }}>
+                    {mode === "photo" && !photo ? "📸"
+                      : mode === "song"  ? "🎤"
+                      : mode === "story" ? "📖"
+                      : "🎨"}
+                  </span>
                 </div>
                 <p className="text-3xl font-black text-purple-800">
                   {mode === "photo" && !photo ? "בחר/י תמונה"
@@ -435,8 +430,8 @@ function AppInner() {
                     : mode === "story" ? "על מה הסיפור?"
                     : "דבר/י מה תרצה/י!"}
                 </p>
-                <p className="text-purple-400 font-bold text-base mt-2">
-                  {mode === "song" ? "🎤 שיר/י לי את הרעיון" : "🦄 כלב ורוד • חד קרן • נסיכה"}
+                <p className="text-4xl mt-2">
+                  {mode === "song" ? "🎵🎶🎸" : mode === "story" ? "🌙⭐🦁" : "🦄🌈🐕"}
                 </p>
               </div>
             )}
