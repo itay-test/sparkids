@@ -9,7 +9,7 @@ import VoiceClone from "./components/VoiceClone";
 import CharacterPicker from "./components/CharacterPicker";
 import StoryPlayer from "./components/StoryPlayer";
 import UserSwitcher from "./components/UserSwitcher";
-import GalleryRow from "./components/GalleryRow";
+// GalleryRow removed — generic thumbnails not meaningful for 3-5 year olds
 import CompanionCreator from "./components/CompanionCreator";
 import CompanionAvatar from "./components/CompanionAvatar";
 import Logo from "./components/Logo";
@@ -67,7 +67,6 @@ export default function App() {
   const [storyChar, setStoryChar]   = useState(null);
   const [storyStep, setStoryStep]   = useState("character");
   const [shareData, setShareData]   = useState(null);
-  const [galleryItem, setGalleryItem] = useState(null);
   const abortRef = useRef(null);
 
   const isIdle      = status === "idle";
@@ -76,6 +75,7 @@ export default function App() {
   const isDone      = status === "done";
 
   const canGoBack = mode !== null || photo || status !== "idle" || result || song || storyData;
+
 
   // ── Creation handlers ─────────────────────────────────────
   async function handleTranscript(text, audioB64 = null) {
@@ -176,7 +176,6 @@ export default function App() {
   }
 
   function switchUser(id) { reset(); setActiveUserId(id); }
-  function openGalleryItem(item) { setGalleryItem(item); }
 
   // ── Render ────────────────────────────────────────────────
   return (
@@ -244,7 +243,7 @@ export default function App() {
       <div className="w-full max-w-md px-4 flex flex-col gap-5 relative z-10 mt-8">
 
         {/* ── Home: mode selector ────────────────────────── */}
-        {!mode && !galleryItem && (
+        {!mode && (
           <div className="flex flex-col items-center gap-5 animate-pop">
 
             <div className="text-center">
@@ -324,7 +323,6 @@ export default function App() {
               <span className="text-purple-700 font-black text-2xl">🎵 שיר קריוקי</span>
             </button>
 
-            <GalleryRow items={gallery.items} onOpen={openGalleryItem}/>
           </div>
         )}
 

@@ -10,6 +10,32 @@ _gemini = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 TEXT_MODEL  = "gemini-2.5-flash"
 MUSIC_MODEL = "lyria-3-pro-preview"
 
+import re
+
+def _clean_lyrics(text: str) -> str:
+    """Strip markdown, structural labels, and any trailing English style lines."""
+    text = re.sub(r'\*{1,3}([^*\n]+)\*{1,3}', r'\1', text)   # **bold** / *italic*
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)  # # headings
+    text = re.sub(r'^[-*_]{2,}\s*$', '', text, flags=re.MULTILINE)  # --- *** ___
+    text = re.sub(r'^\*+\s*$', '', text, flags=re.MULTILINE)   # lone asterisks
+    # Remove structural labels: (Verse 1), [Chorus], <verse 1>, Verse 1:, בית 1:
+    text = re.sub(r'^\s*[<\(\[]?\s*(verse|chorus|bridge|בית|פזמון|גשר)\s*\d*\s*[>\)\]:]?\s*$',
+                  '', text, flags=re.MULTILINE | re.IGNORECASE)
+    # Remove any trailing paragraph that is mostly ASCII (music style description leaked in)
+    paragraphs = re.split(r'\n{2,}', text)
+    filtered = []
+    for p in paragraphs:
+        lines = [l for l in p.strip().splitlines() if l.strip()]
+        if lines:
+            # Skip paragraph if >60% of chars are ASCII (likely English style note)
+            all_chars = ''.join(lines)
+            ascii_ratio = sum(c.isascii() for c in all_chars) / max(len(all_chars), 1)
+            if ascii_ratio < 0.6:
+                filtered.append(p.strip())
+    text = '\n\n'.join(filtered)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
 
 def make_song_lyrics(idea: str, preferences: str = "", companion_name: str = "", companion_likes: str = "") -> tuple:
     """Returns (lyrics_hebrew, music_style_english)."""
@@ -26,11 +52,12 @@ def make_song_lyrics(idea: str, preferences: str = "", companion_name: str = "",
             f"A child (age 3-5) wants a fun karaoke song about: '{idea}' (may be in Hebrew or baby talk).{pref_line}{companion_line}\n"
             "Write a joyful, very singable Hebrew children's karaoke song with strong rhythm, clear rhymes, and short lines easy to sing along:\n\n"
             "LYRICS:\n"
-            "<verse 1: 2 short rhyming lines>\n"
-            "<chorus: 2 very catchy rhyming lines — the HOOK kids will love>\n"
-            "<verse 2: 2 short rhyming lines>\n"
-            "<chorus again>\n"
-            "Max 8 lines total. Very simple words. Strong bouncy beat. Hebrew only. Each line max 6 words.\n\n"
+            "[2 rhyming lines]\n"
+            "[2 catchy chorus lines — the hook]\n"
+            "[2 rhyming lines]\n"
+            "[repeat chorus]\n"
+            "Max 8 lines total. ONLY the song lines — NO labels, NO headers, NO asterisks, NO (Verse), NO [Chorus], NO markdown. "
+            "Just the words. Hebrew only. Each line max 6 words.\n\n"
             "MUSIC STYLE: <detailed style — tempo (e.g. lively 120bpm), key (e.g. C major), specific instruments, mood — English, max 20 words>"
         ),
     )
@@ -38,10 +65,10 @@ def make_song_lyrics(idea: str, preferences: str = "", companion_name: str = "",
     lyrics, style = "", "upbeat happy children's pop, 120bpm, glockenspiel and ukulele, C major key, bouncy"
     if "LYRICS:" in raw and "MUSIC STYLE:" in raw:
         parts = raw.split("MUSIC STYLE:")
-        lyrics = parts[0].replace("LYRICS:", "").strip()
+        lyrics = _clean_lyrics(parts[0].replace("LYRICS:", ""))
         style  = parts[1].strip()
     else:
-        lyrics = raw
+        lyrics = _clean_lyrics(raw)
     return lyrics, style
 
 
@@ -62,7 +89,7 @@ def improve_song_lyrics(feedback: str, previous_lyrics: str, companion_name: str
     lyrics, style = previous_lyrics, "upbeat happy children's pop, 120bpm, glockenspiel and ukulele, C major key, bouncy"
     if "LYRICS:" in raw and "MUSIC STYLE:" in raw:
         parts = raw.split("MUSIC STYLE:")
-        lyrics = parts[0].replace("LYRICS:", "").strip()
+        lyrics = _clean_lyrics(parts[0].replace("LYRICS:", ""))
         style  = parts[1].strip()
     return lyrics, style
 
