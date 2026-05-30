@@ -2,6 +2,7 @@ services:
   - type: web
     name: nitzutz-api
     runtime: python
+    pythonVersion: "3.11.0"
     region: frankfurt
     rootDir: backend
     buildCommand: pip install -r requirements.txt
@@ -13,4 +14,6 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://sparkids-7f4a4.web.app
+      - key: PYTHON_VERSION
+        value: "3.11.0"
     healthCheckPath: /health
