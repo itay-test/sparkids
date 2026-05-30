@@ -1,28 +1,16 @@
 services:
   - type: web
-    name: sparkids-backend
+    name: nitzutz-api
     runtime: python
+    region: frankfurt
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    plan: free
     envVars:
       - key: GOOGLE_API_KEY
         sync: false
+      - key: FIREBASE_SA_KEY_B64
+        sync: false
       - key: FRONTEND_URL
-        sync: false
-
-  - type: web
-    name: sparkids-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    plan: free
-    envVars:
-      - key: VITE_API_URL
-        sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+        value: https://sparkids-7f4a4.web.app
+    healthCheckPath: /health

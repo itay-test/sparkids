@@ -15,8 +15,15 @@ def _init():
         import firebase_admin
         from firebase_admin import credentials, firestore
 
-        key_path = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY", "serviceAccountKey.json")
-        if os.path.exists(key_path):
+        # Support base64-encoded key for cloud deployments (Render, etc.)
+        sa_key_b64 = os.environ.get("FIREBASE_SA_KEY_B64")
+        key_path   = os.environ.get("FIREBASE_SERVICE_ACCOUNT_KEY", "serviceAccountKey.json")
+
+        if sa_key_b64:
+            import base64, json, tempfile
+            key_data = json.loads(base64.b64decode(sa_key_b64).decode())
+            cred = credentials.Certificate(key_data)
+        elif os.path.exists(key_path):
             cred = credentials.Certificate(key_path)
         else:
             # Allow running without Firebase in local dev
